@@ -1,0 +1,61 @@
+{
+    "pages": [
+        {
+            "path": "pages/index/index",
+            "style": {
+                "navigationBarTitleText": "时空旅人拍卖会",
+                "enablePullDownRefresh": false
+            }
+        },
+        {
+            "path": "pages/card-detail/card-detail",
+            "style": {
+                "navigationBarTitleText": "奇物详情"
+            }
+        },
+        {
+            "path": "pages/shop/shop",
+            "style": {
+                "navigationBarTitleText": "道具商店"
+            }
+        },
+        {
+            "path": "pages/collection/collection",
+            "style": {
+                "navigationBarTitleText": "收藏集"
+            }
+        }
+    ],
+    "globalStyle": {
+        "navigationBarTextStyle": "black",
+        "navigationBarTitleText": "时空旅人拍卖会",
+        "navigationBarBackgroundColor": "#F8F8F8",
+        "backgroundColor": "#F8F8F8"
+    },
+    "tabBar": {
+        "color": "#7A7E83",
+        "selectedColor": "#3cc51f",
+        "borderStyle": "black",
+        "backgroundColor": "#ffffff",
+        "list": [
+            {
+                "pagePath": "pages/index/index",
+                "iconPath": "static/tab-home.png",
+                "selectedIconPath": "static/tab-home-current.png",
+                "text": "游戏"
+            },
+            {
+                "pagePath": "pages/shop/shop",
+                "iconPath": "static/tab-shop.png",
+                "selectedIconPath": "static/tab-shop-current.png",
+                "text": "商店"
+            },
+            {
+                "pagePath": "pages/collection/collection",
+                "iconPath": "static/tab-collection.png",
+                "selectedIconPath": "static/tab-collection-current.png",
+                "text": "收藏"
+            }
+        ]
+    }
+}

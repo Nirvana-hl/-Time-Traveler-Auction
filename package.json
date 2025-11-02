@@ -1,0 +1,34 @@
+{
+  "name": "peace-sale",
+  "version": "1.0.0",
+  "description": "时空旅人拍卖会 - 结合实体卡牌与数字技术的创新线下桌游",
+  "main": "main.js",
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "dev": "vue-cli-service serve",
+    "start": "vue-cli-service serve"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.76.0",
+    "core-js": "^3.6.5",
+    "regenerator-runtime": "^0.12.1",
+    "tslib": "^2.8.1",
+    "vue": "^2.6.11",
+    "vue-router": "^3.2.0",
+    "vuex": "^3.2.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~4.5.0",
+    "@vue/cli-service": "~4.5.0",
+    "cross-env": "^7.0.2",
+    "vue-template-compiler": "^2.6.11"
+  },
+  "browserslist": [
+    "Android >= 4.4",
+    "ios >= 9"
+  ],
+  "uni-app": {
+    "scripts": {}
+  }
+}

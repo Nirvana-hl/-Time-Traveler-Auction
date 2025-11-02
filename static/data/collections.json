@@ -1,0 +1,38 @@
+[
+  {
+    "id": "collection_001",
+    "name": "艺术瑰宝",
+    "description": "收集3件艺术品",
+    "requiredCount": 3,
+    "tags": ["艺术瑰宝"],
+    "rewardPoints": 50,
+    "icon": "/static/images/collections/art_collection.png"
+  },
+  {
+    "id": "collection_002",
+    "name": "科技奇点",
+    "description": "收集2件科技品",
+    "requiredCount": 2,
+    "tags": ["科技奇点"],
+    "rewardPoints": 40,
+    "icon": "/static/images/collections/tech_collection.png"
+  },
+  {
+    "id": "collection_003",
+    "name": "生命奥秘",
+    "description": "收集3件生物相关物品",
+    "requiredCount": 3,
+    "tags": ["生命奥秘"],
+    "rewardPoints": 60,
+    "icon": "/static/images/collections/life_collection.png"
+  },
+  {
+    "id": "collection_004",
+    "name": "权力象征",
+    "description": "收集2件权力物品",
+    "requiredCount": 2,
+    "tags": ["权力象征"],
+    "rewardPoints": 45,
+    "icon": "/static/images/collections/power_collection.png"
+  }
+]
