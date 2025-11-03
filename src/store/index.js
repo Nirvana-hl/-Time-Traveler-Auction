@@ -220,6 +220,25 @@ const store = new Vuex.Store({
       }
       // 移除本地拍卖
       commit('REMOVE_AUCTION', result.id)
+      // 立即刷新当前用户手牌（避免必须刷新页面）
+      try {
+        const supabase = getSupabase()
+        const uid = state.user && state.user.id
+        const rid = state.roomId
+        if (uid && rid) {
+          const { data: owned } = await supabase
+            .from('room_artifacts')
+            .select('artifact_id')
+            .eq('room_id', rid)
+            .eq('owner_user_id', uid)
+          const aids = (owned || []).map(r => r.artifact_id)
+          if (state.currentPlayer) {
+            const next = { ...state.currentPlayer, artifacts: aids }
+            commit('SET_CURRENT_PLAYER', next)
+          }
+          commit('SET_PLAYER_ARTIFACTS', aids)
+        }
+      } catch (_) {}
       return result
     },
     
