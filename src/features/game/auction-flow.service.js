@@ -12,7 +12,6 @@ export async function startGame({
   supabase,
   setCountdown,
   setCurrentPlayerFromRoom,
-  onCountdownDone,
 }) {
   if (!roomId || !userId || !isOwner || !allReady) return
 
@@ -23,9 +22,8 @@ export async function startGame({
   // 初始化 UI 状态
   store.commit('SET_GAME_PHASE', 'countdown')
   setCountdown(5)
-  // 回合归零并广播
-  const totalRounds = (store && store.state && store.state.totalRounds) || 6
-  try { await supabase.channel(`room_cast_${roomId}`).send({ type: 'broadcast', event: 'round_updated', payload: { round: 0, total: totalRounds } }) } catch (_) {}
+  // 回合归零并设置总回合数（6）
+  try { store.commit('RESET_ROUND'); store.commit('SET_ROUND_TOTAL', 6) } catch (_) {}
   store.commit('ADD_GAME_LOG', { timestamp: Date.now(), message: '游戏开始！所有玩家获得50点初始能量（5s后开始拍卖）' })
 
   // 设置当前玩家（从 room 中解析）
@@ -49,9 +47,6 @@ export async function autoStartAuction({
   loadArtifacts,
   dispatchStartAuction,
   startAuctionTimer,
-  roundCount,
-  totalRounds,
-  setRoundCount,
 }) {
   store.commit('SET_GAME_PHASE', 'auction')
 
@@ -74,13 +69,19 @@ export async function autoStartAuction({
   // 启动统一倒计时
   startAuctionTimer(30)
 
-  // 广播并推进回合
+  // 推进回合并在第6回合后结束游戏（房主触发）
+  try {
+    const current = Number(store.state.roundCurrent || 0) + 1
+    const total = Number(store.state.roundTotal || 6)
+    store.commit('SET_ROUND_CURRENT', Math.min(current, total))
+  } catch (_) {}
+
   if (roomId) {
     await supabase.channel(`room_cast_${roomId}`).send({ type: 'broadcast', event: 'auction_started', payload: { artifacts: picks, duration: 30 } })
-    const nextRound = Math.min(roundCount + 1, totalRounds)
-    setRoundCount(nextRound)
-    await supabase.channel(`room_cast_${roomId}`).send({ type: 'broadcast', event: 'round_updated', payload: { round: nextRound, total: totalRounds } })
-    if (nextRound >= totalRounds) {
+    const current = Number(store.state.roundCurrent || 0)
+    const total = Number(store.state.roundTotal || 6)
+    // 结束条件：达到总回合数
+    if (current >= total) {
       try { await supabase.from('rooms').update({ status: 'ended' }).eq('id', roomId) } catch (_) {}
       await supabase.channel(`room_cast_${roomId}`).send({ type: 'broadcast', event: 'game_ended', payload: { reason: 'round_limit' } })
     }

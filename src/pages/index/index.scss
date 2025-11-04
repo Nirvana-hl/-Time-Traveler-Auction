@@ -43,12 +43,22 @@
   margin: 16px;
   padding: 20px;
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   position: relative;
   z-index: 10;
 }
+
+/* 房间信息块优化 */
+.room-info { display:flex; flex-direction: column; gap: 6px; }
+.room-name { font-size: 18px; font-weight: 700; color: #e2e8f0; }
+.room-meta { font-size: 12px; color: #94a3b8; }
+.room-id-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:10px; font-size:12px; background: rgba(59,130,246,0.15); color:#e2e8f0; border:1px solid rgba(59,130,246,0.35); width: fit-content; }
+
+/* 回合独立面板，与房间信息分离且不对齐 */
+
 .player-energy-hud {
   display: inline-flex;
   align-items: center;
@@ -100,6 +110,7 @@
   backdrop-filter: blur(20px);
   border: 1px solid rgba(59, 130, 246, 0.2);
   margin: 16px;
+  margin-bottom: 12px;
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   position: relative;
@@ -205,6 +216,11 @@
   position: relative;
   overflow: hidden;
 }
+/* 拍卖阶段靠左对齐，其余阶段保持居中 */
+.auction-stage.align-left {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
 
 .auction-stage::before {
   content: '';
@@ -265,6 +281,14 @@
   transition: all 0.3s ease;
   position: relative;
 }
+.hand-card.fancy { border-radius: 16px; overflow: hidden; }
+.hand-card .hand-media { position: relative; }
+.hand-card .hand-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(2,6,23,0.6));
+  opacity: 0; transition: opacity .3s ease;
+}
+.hand-card:hover .hand-overlay { opacity: 1; }
 
 .hand-card:hover {
   transform: translateY(-8px) scale(1.05);
@@ -274,22 +298,27 @@
 
 .hand-image { 
   width: 100%; 
-  height: 100px; 
+  height: 120px; 
   object-fit: cover;
   transition: all 0.3s ease;
 }
 
 .hand-card:hover .hand-image {
-  transform: scale(1.1);
+  transform: scale(1.06);
 }
 
+.hand-info { padding: 10px 12px 12px; }
 .hand-name { 
-  font-size: 13px; 
+  font-size: 14px; 
   color: #e2e8f0; 
-  padding: 8px 12px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.hand-era { font-size: 12px; color:#94a3b8; margin-top: 4px; }
+.hand-tags { display:flex; gap:6px; margin-top:8px; flex-wrap: wrap; }
+.hand-tag { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color:#fff; border-radius: 10px; padding:2px 6px; font-size:10px; }
+.hand-tag.more { background:#475569; }
 
 .section-title {
   font-size: 16px;
@@ -383,6 +412,16 @@
   font-size: 12px;
   font-weight: bold;
 }
+
+/* 收藏集展开成员样式 */
+.collection-members { display:flex; flex-direction: column; gap:8px; margin-top: 8px; }
+.member-item { display:flex; align-items:center; gap:10px; background: rgba(0,0,0,0.2); border:1px solid #374151; border-radius:10px; padding:8px; }
+.member-image { width:60px; height:40px; object-fit: cover; border-radius:8px; border:1px solid #334155; }
+.member-info { flex:1; }
+.member-name { font-size:13px; color:#e2e8f0; font-weight:600; }
+.member-meta { font-size:12px; color:#94a3b8; }
+.member-status { font-size:12px; color:#ef4444; font-weight:700; }
+.member-status.owned { color:#10b981; }
 
 .progress-container {
   display: flex;

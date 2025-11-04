@@ -5,9 +5,20 @@
         <h3 class="auction-title">🏺 时空拍卖会</h3>
         <p class="auction-subtitle">竞拍来自不同时空的珍贵奇物</p>
       </div>
-      <div class="countdown" v-if="auctionsList.length > 0">
-        <div class="countdown-icon">⏰</div>
-        <span class="countdown-text">{{ countdown }}s</span>
+      <div class="header-right" v-if="auctionsList.length > 0">
+        <div class="energy-badge" v-if="currentPlayerInfo">
+          <span class="icon">⚡</span>
+          <span class="label">能量</span>
+          <span class="value">{{ currentPlayerInfo.energy }}</span>
+        </div>
+        <div class="round-badge-mini">
+          <span class="mini-label">回合</span>
+          <span class="mini-value">{{ roundCurrent }} / {{ roundTotal }}</span>
+        </div>
+        <div class="countdown">
+          <div class="countdown-icon">⏰</div>
+          <span class="countdown-text">{{ countdown }}s</span>
+        </div>
       </div>
     </div>
     
@@ -108,18 +119,12 @@ import { mapState, mapGetters } from 'vuex'
 export default {
   name: 'AuctionPanel',
   props: {
-    currentAuction: {
-      type: Object,
-      default: null
-    },
-    auctions: {
-      type: Array,
-      default: () => []
-    },
-    countdown: {
-      type: Number,
-      default: 0
-    }
+    currentAuction: { type: Object, default: null },
+    auctions: { type: Array, default: () => [] },
+    countdown: { type: Number, default: 0 },
+    // 新增：回合显示由父组件传入，与拍卖会同框展示
+    roundCurrent: { type: Number, default: 0 },
+    roundTotal: { type: Number, default: 6 }
   },
   data() {
     return {
@@ -210,7 +215,6 @@ export default {
   padding: 24px;
   margin: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  color: #e2e8f0;
 }
 
 .auction-header {
@@ -221,6 +225,14 @@ export default {
   padding-bottom: 16px;
   border-bottom: 1px solid #334155;
 }
+.header-right { display:flex; align-items:center; gap: 12px; }
+.energy-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15)); border:1px solid rgba(59,130,246,0.35); }
+.energy-badge .icon { font-size: 14px; }
+.energy-badge .label { font-size: 12px; color:#94a3b8; }
+.energy-badge .value { font-size: 14px; font-weight: 700; color:#e2e8f0; }
+.round-badge-mini { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15)); border:1px solid rgba(59,130,246,0.35); }
+.round-badge-mini .mini-label { font-size: 12px; color:#94a3b8; }
+.round-badge-mini .mini-value { font-size: 14px; font-weight: 700; color:#e2e8f0; }
 
 .auction-title-section {
   flex: 1;

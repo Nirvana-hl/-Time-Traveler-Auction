@@ -27,6 +27,10 @@ const store = new Vuex.Store({
     playerArtifacts: [],
     playerItems: [],
 
+    // 回合状态
+    roundCurrent: 0,
+    roundTotal: 6,
+
     // auth & room
     user: null,
     roomId: null
@@ -107,7 +111,12 @@ const store = new Vuex.Store({
 
     SET_ROOM_ID(state, roomId) {
       state.roomId = roomId
-    }
+    },
+
+    // 回合相关
+    SET_ROUND_CURRENT(state, n) { state.roundCurrent = n },
+    SET_ROUND_TOTAL(state, n) { state.roundTotal = n },
+    RESET_ROUND(state) { state.roundCurrent = 0 }
   },
   
   actions: {

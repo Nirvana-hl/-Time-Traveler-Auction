@@ -2,12 +2,18 @@
 
 export function loadCollectionsFromArtifacts(artifactMap) {
   const tagTotal = {}
+  const tagMembers = {}
   const arts = artifactMap || {}
   Object.keys(arts).forEach(id => {
-    const tags = Array.isArray(arts[id].collectionTags) ? arts[id].collectionTags : []
-    tags.forEach(tag => { tagTotal[tag] = (tagTotal[tag] || 0) + 1 })
+    const art = arts[id]
+    const tags = Array.isArray(art.collectionTags) ? art.collectionTags : []
+    tags.forEach(tag => {
+      tagTotal[tag] = (tagTotal[tag] || 0) + 1
+      if (!tagMembers[tag]) tagMembers[tag] = []
+      tagMembers[tag].push(id)
+    })
   })
-  return Object.keys(tagTotal).map(tag => ({ id: tag, name: tag, description: '', requiredCount: tagTotal[tag] }))
+  return Object.keys(tagTotal).map(tag => ({ id: tag, name: tag, description: '', requiredCount: tagTotal[tag], artifactIds: tagMembers[tag] || [] }))
 }
 
 export function getCurrentCollectionCount({ artifactMap, ownedArtifactIds, collection }) {

@@ -16,13 +16,12 @@
 
     <div class="game-status">
       <div class="room-info">
-        <span class="room-name">{{ room ? (room.name || '未命名房间') : '未加入房间' }}</span>
-        <span class="round-info" v-if="gamePhase !== 'preparation'">回合：{{ roundCount }}/{{ totalRounds }}</span>
-        <span class="room-id">ID: {{ room ? (room.short_id || room.id) : '-' }}</span>
-        <span class="room-meta" v-if="room">玩家 {{ playerCount }}/{{ seatCount }} · 房主：{{ ownerName }}</span>
+        <div class="room-name">{{ room ? (room.name || '未命名房间') : '未加入房间' }}</div>
+        <div class="room-meta" v-if="room">玩家 {{ playerCount }}/{{ seatCount }} · 房主：{{ ownerName }}</div>
+        <div class="room-id-pill">ID: {{ room ? (room.short_id || room.id) : '-' }}</div>
       </div>
       <span class="game-phase">{{ gamePhaseText }}</span>
-       <div class="player-energy-hud" v-if="currentPlayer && gamePhase !== 'countdown' && gamePhase !== 'intermission'">
+       <div class="player-energy-hud" v-if="currentPlayer && gamePhase === 'item'">
         <span class="icon">⚡</span>
         <span class="label">能量</span>
         <span class="value">{{ $store.state.playerEnergy }}</span>
@@ -47,8 +46,8 @@
       </div>
     </div>
 
-    <!-- 拍卖会台（居中） -->
-    <div class="auction-stage">
+    <!-- 拍卖会台（拍卖阶段靠左，其余阶段居中） -->
+    <div class="auction-stage" :class="{ 'align-left': gamePhase === 'auction' }">
       <!-- 预倒计时阶段（游戏开始后5s预热） -->
       <template v-if="gamePhase === 'countdown'">
         <div class="countdown-stage">
@@ -76,7 +75,9 @@
       <auction-panel 
         v-else-if="gamePhase === 'auction' && $store.state.currentAuctions && $store.state.currentAuctions.length" 
         :auctions="$store.state.currentAuctions" 
-        :countdown="auctionCountdown" 
+        :countdown="auctionCountdown"
+        :round-current="$store.state.roundCurrent"
+        :round-total="$store.state.roundTotal"
         @artifact-click="showArtifactDetailFromAuction" 
       />
       <!-- 其他情况显示占位提示 -->
@@ -104,9 +105,35 @@
     <div class="my-hand" v-if="gamePhase !== 'preparation'">
       <h3 class="hand-title">我的手牌</h3>
       <div class="hand-grid">
-        <div v-for="(aid, idx) in (currentPlayer ? currentPlayer.artifacts : [])" :key="aid + '-' + idx" class="hand-card" @click="showArtifactDetail(aid)">
-          <img class="hand-image" :src="artifactMap[aid] ? artifactMap[aid].image : 'https://via.placeholder.com/160x100?text=未知卡牌'" />
-          <div class="hand-name">{{ artifactMap[aid] ? artifactMap[aid].name : aid }}</div>
+        <div
+          v-for="(aid, idx) in (currentPlayer ? currentPlayer.artifacts : [])"
+          :key="aid + '-' + idx"
+          class="hand-card fancy"
+          @click="showArtifactDetail(aid)"
+        >
+          <div class="hand-media">
+            <img
+              class="hand-image"
+              :src="artifactMap[aid] ? artifactMap[aid].image : 'https://via.placeholder.com/160x100?text=未知卡牌'"
+            />
+            <div class="hand-overlay"></div>
+          </div>
+          <div class="hand-info">
+            <div class="hand-name" :title="artifactMap[aid] ? artifactMap[aid].name : aid">
+              {{ artifactMap[aid] ? artifactMap[aid].name : aid }}
+            </div>
+            <div class="hand-era" v-if="artifactMap[aid] && (artifactMap[aid].era || artifactMap[aid].location)">
+              {{ artifactMap[aid].era }}<span v-if="artifactMap[aid].location"> · {{ artifactMap[aid].location }}</span>
+            </div>
+            <div class="hand-tags" v-if="artifactMap[aid] && artifactMap[aid].collectionTags && artifactMap[aid].collectionTags.length">
+              <span
+                class="hand-tag"
+                v-for="tag in artifactMap[aid].collectionTags.slice(0,2)"
+                :key="tag"
+              >{{ tag }}</span>
+              <span class="hand-tag more" v-if="artifactMap[aid].collectionTags.length > 2">+{{ artifactMap[aid].collectionTags.length - 2 }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -122,7 +149,7 @@
             class="collection-progress-item"
             :class="{ completed: collection._current >= collection.requiredCount }"
           >
-            <div class="collection-header">
+            <div class="collection-header" @click="toggleCollection(collection)">
               <div class="collection-icon">🏆</div>
               <div class="collection-info">
                 <div class="collection-name">{{ collection.name }}</div>
@@ -130,6 +157,19 @@
               </div>
               <div class="collection-reward" v-if="collection._current >= collection.requiredCount">
                 <span class="reward-badge">✓</span>
+              </div>
+            </div>
+            <!-- 展开展示该收藏集所需所有商品 -->
+            <div class="collection-members" v-if="expandedCollections[collection.id]">
+              <div class="member-item" v-for="aid in (collection.artifactIds || [])" :key="aid">
+                <img class="member-image" :src="artifactMap[aid] ? artifactMap[aid].image : 'https://via.placeholder.com/60x40?text=No+Img'" />
+                <div class="member-info">
+                  <div class="member-name">{{ artifactMap[aid] ? artifactMap[aid].name : aid }}</div>
+                  <div class="member-meta">{{ artifactMap[aid] && artifactMap[aid].era }}<span v-if="artifactMap[aid] && artifactMap[aid].location"> · {{ artifactMap[aid].location }}</span></div>
+                </div>
+                <div class="member-status" :class="{ owned: currentPlayer && currentPlayer.artifacts && currentPlayer.artifacts.includes(aid) }">
+                  {{ currentPlayer && currentPlayer.artifacts && currentPlayer.artifacts.includes(aid) ? '已拥有' : '未拥有' }}
+                </div>
               </div>
             </div>
             <div class="progress-container">
@@ -307,11 +347,12 @@ export default {
       chatMessages: [],
       newMessage: '',
       chatChannel: null,
-      countdownInProgress: false
+      countdownInProgress: false,
+      expandedCollections: {}
     }
   },
   computed: {
-    ...mapState(['gamePhase', 'gameLog', 'showCardDetail', 'showShop', 'user', 'roomId']),
+    ...mapState(['gamePhase', 'gameLog', 'showCardDetail', 'showShop', 'user', 'roomId', 'roundCurrent', 'roundTotal']),
     // 将当前玩家注入到渲染上下文，避免模板引用报错
     currentPlayer() { return this.$store.state.currentPlayer },
     isOwner() { return this.room && this.user && this.room.owner_id === this.user.id },
@@ -361,15 +402,24 @@ export default {
       }
       return phaseMap[this.gamePhase] || '未知阶段'
     },
+    roundPercent() {
+      const cur = Number(this.$store.state.roundCurrent || 0)
+      const tot = Number(this.$store.state.roundTotal || 6)
+      if (tot <= 0) return 0
+      return Math.min(100, Math.max(0, Math.round((cur / tot) * 100)))
+    },
 
     // 根据当前用户手牌计算收藏集显示数据，带缓存字段，便于模板直接引用
     collectionsComputed() {
       const list = Array.isArray(this.collections) ? this.collections : []
-      return list.map(col => {
-        const current = this.getCurrentCollectionCount(col)
-        const progress = Math.min((current / (col.requiredCount || 1)) * 100, 100)
-        return { ...col, _current: current, _progress: progress }
-      })
+      // 仅展示用户手牌中至少包含1件该收藏集的情况
+      return list
+        .map(col => {
+          const current = this.getCurrentCollectionCount(col)
+          const progress = Math.min((current / (col.requiredCount || 1)) * 100, 100)
+          return { ...col, _current: current, _progress: progress }
+        })
+        .filter(col => col._current > 0)
     }
   },
   async mounted() {
@@ -430,10 +480,8 @@ export default {
               this.$store.commit('ADD_OR_UPDATE_AUCTION', next)
             }
           },
-          onRoundUpdated: ({ round, total }) => {
-            if (typeof round === 'number') this.roundCount = round
-            if (typeof total === 'number') this.totalRounds = total
-          },
+          // 旧回合广播已移除，统一本地推进，不再接收该事件
+          onRoundUpdated: (_data) => {},
           onGameEnded: () => {
             this.$store.commit('SET_GAME_PHASE', 'settlement')
             this.showGameEndDialog = true
@@ -688,6 +736,13 @@ export default {
       const required = collection.requiredCount
       return getCollectionProgressUtil({ current, required })
     },
+
+    // 展开/收起收藏集
+    toggleCollection(collection) {
+      const id = collection && collection.id
+      if (!id) return
+      this.$set(this.expandedCollections, id, !this.expandedCollections[id])
+    },
     
     // 关闭游戏结束对话框
     closeGameEndDialog() {
@@ -709,7 +764,7 @@ export default {
       this.$router.push('/rooms')
     },
     
-    // 时间到：结束当前所有拍卖并结算到对应玩家手牌，然后进入10s间歇
+    // 时间到：结束当前所有拍卖并结算到对应玩家手牌，然后进入10s间歇或结束游戏
     async onAuctionTimeUp() {
       try {
         const auctions = this.$store.state.currentAuctions || []
@@ -717,7 +772,16 @@ export default {
         for (const a of auctions) {
           await this.$store.dispatch('endAuction', a.id)
         }
-        // 进入10s间歇阶段
+        // 判断是否达到总回合数
+        const cur = Number(this.$store.state.roundCurrent || 0)
+        const tot = Number(this.$store.state.roundTotal || 6)
+        if (cur >= tot) {
+          // 触发结束
+          this.$store.commit('SET_GAME_PHASE', 'settlement')
+          this.showGameEndDialog = true
+          return
+        }
+        // 否则进入10s间歇阶段
         this.startIntermissionTimer(10)
       } catch (e) { console.warn('[game] onAuctionTimeUp failed', e) }
     },
