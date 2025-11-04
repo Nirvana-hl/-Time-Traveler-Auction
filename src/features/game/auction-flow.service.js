@@ -69,6 +69,14 @@ export async function autoStartAuction({
   // 启动统一倒计时
   startAuctionTimer(30)
 
+  try {
+    // 日志：本轮拍卖上架的商品
+    const names = uniquePicks.map(a => a && a.name).filter(Boolean)
+    if (names.length) {
+      store.commit('ADD_GAME_LOG', { timestamp: Date.now(), message: `新一轮拍卖开始：${names.join('、')}` })
+    }
+  } catch (_) {}
+
   // 推进回合并在第6回合后结束游戏（房主触发）
   try {
     const current = Number(store.state.roundCurrent || 0) + 1

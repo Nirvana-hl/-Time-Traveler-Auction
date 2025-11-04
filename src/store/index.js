@@ -61,6 +61,9 @@ const store = new Vuex.Store({
     ADD_GAME_LOG(state, log) {
       state.gameLog.push(log)
     },
+    CLEAR_GAME_LOG(state) {
+      state.gameLog = []
+    },
     
     // UI状态相关
     SET_SHOW_CARD_DETAIL(state, show) {
@@ -180,6 +183,11 @@ const store = new Vuex.Store({
               payload: { auctionId, highestBid: updated.highestBid, highestBidder: updated.highestBidder, playerName }
             })
           }
+        } catch (_) {}
+        // 添加游戏日志：出价动态
+        try {
+          const artName = updated && updated.artifact && updated.artifact.name ? updated.artifact.name : '拍品'
+          commit('ADD_GAME_LOG', { timestamp: Date.now(), message: `${playerName} 对 ${artName} 出价 ${updated.highestBid}` })
         } catch (_) {}
         return bid
       } catch (error) {

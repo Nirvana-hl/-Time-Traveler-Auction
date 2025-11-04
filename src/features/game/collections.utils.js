@@ -13,16 +13,30 @@ export function loadCollectionsFromArtifacts(artifactMap) {
       tagMembers[tag].push(id)
     })
   })
-  return Object.keys(tagTotal).map(tag => ({ id: tag, name: tag, description: '', requiredCount: tagTotal[tag], artifactIds: tagMembers[tag] || [] }))
+  return Object.keys(tagTotal).map(tag => ({
+    id: tag,
+    name: tag,
+    description: '',
+    requiredCount: tagTotal[tag],
+    rewardPoints: Math.max(10, tagTotal[tag] * 5),
+    artifactIds: tagMembers[tag] || []
+  }))
 }
 
 export function getCurrentCollectionCount({ artifactMap, ownedArtifactIds, collection }) {
   if (!Array.isArray(ownedArtifactIds)) return 0
   const requiredCap = Number(collection.requiredCount) || Infinity
   let count = 0
-  ownedArtifactIds.forEach(artifactId => {
+  const uniqueOwned = Array.from(new Set(ownedArtifactIds))
+  uniqueOwned.forEach(artifactId => {
     const artifact = artifactMap[artifactId]
-    if (artifact && Array.isArray(artifact.collectionTags) && artifact.collectionTags.includes(collection.name)) count++
+    if (
+      artifact &&
+      Array.isArray(artifact.collectionTags) &&
+      artifact.collectionTags.includes(collection.name)
+    ) {
+      count++
+    }
   })
   return Math.min(count, requiredCap)
 }

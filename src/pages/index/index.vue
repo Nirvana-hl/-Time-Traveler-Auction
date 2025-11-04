@@ -188,10 +188,10 @@
       </div>
     </div>
 
-    <!-- 聊天面板（右侧） -->
+    <!-- 聊天 / 日志 面板（右侧） -->
     <div class="chat-panel" v-if="gamePhase !== 'preparation'">
       <div class="chat-header">
-        <h4 class="chat-title">房间聊天</h4>
+        <h4 class="chat-title">聊天 / 日志</h4>
         <div class="chat-status">
           <span class="status-dot"></span>
           <span class="status-text">在线</span>
@@ -200,13 +200,13 @@
       
       <div class="chat-messages" ref="chatContainer">
         <div 
-          v-for="message in chatMessages" 
+          v-for="message in chatFeed" 
           :key="message.id"
           class="chat-message"
-          :class="{ 'own-message': message.userId === (user && user.id) }"
+          :class="{ 'own-message': message.type === 'chat' && message.userId === (user && user.id), 'system-log': message.type === 'log' }"
         >
           <div class="message-header">
-            <span class="message-username">{{ message.username }}</span>
+            <span class="message-username">{{ message.type === 'log' ? '系统' : message.username }}</span>
             <span class="message-time">{{ formatMessageTime(message.timestamp) }}</span>
           </div>
           <div class="message-content">{{ message.content }}</div>
@@ -249,10 +249,44 @@
             </span>
           </div>
           <p class="detail-value">基础价值: {{ selectedCard.baseValue }}</p>
+            <div class="detail-actions">
+              <button class="control-button" @click="openNarration">讲述</button>
+            </div>
         </div>
         <button class="close-button" @click="hideCardDetail">关闭</button>
       </div>
     </div>
+
+      <!-- 文物讲述弹层：角色讲述 + 关键信息复述 -->
+      <div v-if="showNarration && selectedCard" class="narration-popup">
+        <div class="popup-overlay" @click="closeNarration"></div>
+        <div class="popup-content narration-content">
+          <div class="narration-dialog">
+            <!-- 左侧：角色大图与姓名 -->
+            <div class="character-side" :style="{ borderColor: narrationCharacter && narrationCharacter.color ? narrationCharacter.color : '#3b82f6' }">
+              <img class="character-image" :src="(narrationCharacter && narrationCharacter.image) || '/images/guide.png'" />
+              <div class="character-name" :style="{ color: narrationCharacter && narrationCharacter.color ? narrationCharacter.color : '#3b82f6' }">
+                {{ narrationCharacterName }}
+              </div>
+            </div>
+            <!-- 右侧：对白气泡 -->
+            <div class="speech-side">
+              <div class="speech-bubble">
+                <div class="speech-header">
+                  <span class="badge era" v-if="selectedCard.era">{{ selectedCard.era }}</span>
+                  <span class="badge location" v-if="selectedCard.location">{{ selectedCard.location }}</span>
+                  <span class="badge value" v-if="selectedCard.baseValue !== undefined">价值 {{ selectedCard.baseValue }}</span>
+                  <span class="badge tags" v-if="(selectedCard.collectionTags || []).length">{{ (selectedCard.collectionTags || []).join('、') }}</span>
+                </div>
+                <div class="speech-text">{{ typingText }}</div>
+              </div>
+              <div class="narration-actions">
+                <button class="control-button primary" @click="closeNarration">好的</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     <!-- 道具商店弹窗 -->
     <div v-if="showShop" class="shop-popup">
@@ -285,7 +319,16 @@
         <div class="game-end-header">
           <div class="game-end-icon">🏆</div>
           <h2 class="game-end-title">游戏结束</h2>
-          <p class="game-end-subtitle">感谢参与时空旅人拍卖会！</p>
+          <p class="game-end-subtitle" v-if="winnerInfo">胜者：{{ winnerInfo.name }} · 总分 {{ winnerInfo.total }}</p>
+          <p class="game-end-subtitle" v-else>感谢参与时空旅人拍卖会！</p>
+        </div>
+        <div class="final-scoreboard" v-if="finalScores && finalScores.length">
+          <div class="score-row" v-for="(p, idx) in finalScores" :key="p.userId">
+            <div class="rank">{{ idx + 1 }}</div>
+            <img class="score-avatar" :src="p.avatar" />
+            <div class="name">{{ p.name }}</div>
+            <div class="detail">收藏集 {{ p.collectionScore }} + 奇物 {{ p.artifactScore }} = <b>{{ p.total }}</b></div>
+          </div>
         </div>
         
         <div class="game-end-actions">
@@ -320,6 +363,7 @@ import { toggleReady as toggleReadyAction, moveToSeat as moveToSeatAction, leave
 import { loadArtifacts as loadArtifactsService } from '../../features/game/artifacts.service'
 import { loadCollectionsFromArtifacts, getCurrentCollectionCount as getCollectionCountUtil, getCollectionProgress as getCollectionProgressUtil } from '../../features/game/collections.utils'
 import { formatMessageTime as formatMessageTimeHelper, getAvatarFor as getAvatarForHelper, getNameFor as getNameForHelper } from '../../features/game/ui.helpers'
+import { firstLoginDialogue as firstLoginDialogueConfig, getCurrentLanguage as getCurrentLanguageImported } from '../../config/dialogue-config'
 export default {
   name: 'GameIndex',
   components: {
@@ -338,6 +382,8 @@ export default {
       refreshTimer: null,
       collections: [],
       showGameEndDialog: false,
+      finalScores: [],
+      winnerInfo: null,
       auctionCountdown: 0,
       auctionTimer: null,
       currentAuction: null,
@@ -348,7 +394,10 @@ export default {
       newMessage: '',
       chatChannel: null,
       countdownInProgress: false,
-      expandedCollections: {}
+      expandedCollections: {},
+      showNarration: false,
+      typingText: '',
+      typingTimer: null
     }
   },
   computed: {
@@ -420,6 +469,30 @@ export default {
           return { ...col, _current: current, _progress: progress }
         })
         .filter(col => col._current > 0)
+    },
+
+    // 合并聊天与系统日志为同一信息流，按时间排序
+    chatFeed() {
+      const logs = (this.gameLog || []).map((l, idx) => ({
+        id: `log-${l.timestamp || idx}`,
+        type: 'log',
+        userId: null,
+        username: '系统',
+        content: l.message,
+        timestamp: l.timestamp || 0
+      }))
+      const chats = (this.chatMessages || []).map(m => ({ ...m, type: 'chat' }))
+      const merged = [...logs, ...chats]
+      return merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    },
+    // 暴露对话配置供模板使用
+    firstLoginConfig() { return firstLoginDialogueConfig },
+    // 当前讲述角色配置与名称
+    narrationCharacterName() { return (this.getCurrentLanguage() === 'zh-CN') ? '大木博士' : 'Dr. Alina' },
+    narrationCharacter() {
+      const key = this.narrationCharacterName
+      const chars = firstLoginDialogueConfig && firstLoginDialogueConfig.characters
+      return (chars && chars[key]) ? chars[key] : { image: '/images/guide.png', position: 'right', color: '#3b82f6' }
     }
   },
   async mounted() {
@@ -433,7 +506,16 @@ export default {
     this.unsubscribeRoomRealtime()
     if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null }
     if (this.auctionTimer) { clearInterval(this.auctionTimer); this.auctionTimer = null }
+    if (this.typingTimer) { clearInterval(this.typingTimer); this.typingTimer = null }
     this.$set(this, 'auctionCountdown', 0)
+  },
+  watch: {
+    gameLog() {
+      this.$nextTick(() => {
+        const chatContainer = this.$refs.chatContainer
+        if (chatContainer) { chatContainer.scrollTop = chatContainer.scrollHeight }
+      })
+    }
   },
   methods: {
     // 去掉模拟初始化玩家，改为使用房间的实际玩家列表
@@ -484,7 +566,7 @@ export default {
           onRoundUpdated: (_data) => {},
           onGameEnded: () => {
             this.$store.commit('SET_GAME_PHASE', 'settlement')
-            this.showGameEndDialog = true
+        this.computeFinalScores().finally(() => { this.showGameEndDialog = true })
             if (this.auctionTimer) { clearInterval(this.auctionTimer); this.auctionTimer = null }
           },
           onAuctionEnded: async () => { await this.loadRoomState() },
@@ -585,6 +667,8 @@ export default {
         const rid = this.$store.state.roomId
         const uid = this.$store.state.user && this.$store.state.user.id
         if (!rid || !uid || !this.isOwner || !this.allReady) return
+        // 新局开始前重置系统日志
+        try { this.$store.commit('CLEAR_GAME_LOG') } catch (_) {}
         await roomService.startGame(rid, uid)
         const supabase = getSupabase()
         this.roundCount = 0
@@ -684,7 +768,8 @@ export default {
     },
     showArtifactDetailFromAuction(artifact) {
       this.selectedCard = artifact
-      this.$store.commit('SET_SHOW_CARD_DETAIL', true)
+      this.$store.commit('SET_SHOW_CARD_DETAIL', false)
+      this.openNarration()
     },
 
     showPlayerHand(player) {
@@ -710,6 +795,7 @@ export default {
     },
     getAvatarFor(userId) { return getAvatarForHelper({ profileMap: this.profileMap, userId }) },
     getNameFor(userId) { return getNameForHelper({ profileMap: this.profileMap, room: this.room, userId }) },
+    getCurrentLanguage() { return getCurrentLanguageImported() },
     
     // 加载收藏集数据：基于数据库 artifacts 的 collection_tags 动态生成
     async loadCollections() {
@@ -752,16 +838,28 @@ export default {
     // 留在房间
     stayInRoom() {
       this.showGameEndDialog = false
-      // 保持在当前房间，不进行任何跳转
+      try { this.$store.commit('CLEAR_GAME_LOG') } catch (_) {}
+      // 返回当前房间准备界面
+      const rid = this.$store.state.roomId
+      if (rid) {
+        this.$store.commit('SET_GAME_PHASE', 'preparation')
+        this.$router.push({ path: '/game', query: { roomId: rid } })
+      }
     },
     
     // 返回房间列表
     goToRooms() {
       this.showGameEndDialog = false
       this.unsubscribeRoomRealtime()
-      this.$store.commit('SET_ROOM_ID', null)
-      this.room = null
-      this.$router.push('/rooms')
+      try { this.$store.commit('CLEAR_GAME_LOG') } catch (_) {}
+      // 返回当前房间准备界面（更符合期望）
+      const rid = this.$store.state.roomId
+      if (rid) {
+        this.$store.commit('SET_GAME_PHASE', 'preparation')
+        this.$router.push({ path: '/game', query: { roomId: rid } })
+      } else {
+        this.$router.push('/rooms')
+      }
     },
     
     // 时间到：结束当前所有拍卖并结算到对应玩家手牌，然后进入10s间歇或结束游戏
@@ -778,6 +876,7 @@ export default {
         if (cur >= tot) {
           // 触发结束
           this.$store.commit('SET_GAME_PHASE', 'settlement')
+          await this.computeFinalScores()
           this.showGameEndDialog = true
           return
         }
@@ -847,6 +946,88 @@ export default {
     
     // 格式化消息时间
     formatMessageTime(timestamp) { return formatMessageTimeHelper(timestamp) }
+    ,
+
+    // 计算最终得分并确定赢家
+    async computeFinalScores() {
+      try {
+        const rid = this.$store.state.roomId
+        if (!rid) return
+        const supabase = getSupabase()
+        const { data: rows } = await supabase
+          .from('room_artifacts')
+          .select('owner_user_id, artifact_id')
+          .eq('room_id', rid)
+        const userToArtifacts = {}
+        ;(rows || []).forEach(r => {
+          if (!userToArtifacts[r.owner_user_id]) userToArtifacts[r.owner_user_id] = []
+          userToArtifacts[r.owner_user_id].push(r.artifact_id)
+        })
+
+        const collections = Array.isArray(this.collections) ? this.collections : []
+        const scores = Object.keys(userToArtifacts).map(uid => {
+          const owned = userToArtifacts[uid]
+          // 收藏集分数
+          let collectionScore = 0
+          collections.forEach(col => {
+            const current = getCollectionCountUtil({ artifactMap: this.artifactMap, ownedArtifactIds: owned, collection: col })
+            if (current >= (col.requiredCount || 1)) collectionScore += (col.rewardPoints || 0)
+          })
+          // 零散奇物分数（基础价值一半，向下取整）
+          let artifactScore = 0
+          owned.forEach(aid => {
+            const a = this.artifactMap[aid]
+            if (a && typeof a.baseValue === 'number') artifactScore += Math.floor(a.baseValue / 2)
+          })
+        
+          const total = collectionScore + artifactScore
+          return {
+            userId: uid,
+            name: this.getNameFor(uid),
+            avatar: this.getAvatarFor(uid),
+            collectionScore,
+            artifactScore,
+            total
+          }
+        })
+
+        const sorted = scores.sort((a, b) => b.total - a.total)
+        this.finalScores = sorted
+        this.winnerInfo = sorted[0] || null
+
+        if (this.winnerInfo) {
+          this.$store.commit('ADD_GAME_LOG', { timestamp: Date.now(), message: `本局结束，胜者：${this.winnerInfo.name}（总分 ${this.winnerInfo.total}）` })
+        }
+      } catch (e) { console.warn('[game] computeFinalScores failed', e) }
+    },
+
+    // 开启/关闭文物讲述
+    openNarration() {
+      // 构造讲述文本，包含基本介绍 + 故事
+      const base = `${this.selectedCard.name}，来自 ${this.selectedCard.era}${this.selectedCard.location ? ' · ' + this.selectedCard.location : ''}。\n`
+      const story = (this.selectedCard.story || '').trim()
+      const full = `${base}${story}`.trim()
+      // 打字机效果
+      this.typingText = ''
+      this.showNarration = true
+      const speed = (firstLoginDialogueConfig && firstLoginDialogueConfig.animations && firstLoginDialogueConfig.animations.textTypingSpeed) || 30
+      if (this.typingTimer) { clearInterval(this.typingTimer); this.typingTimer = null }
+      let i = 0
+      this.typingTimer = setInterval(() => {
+        if (i >= full.length) {
+          clearInterval(this.typingTimer)
+          this.typingTimer = null
+        } else {
+          this.typingText += full[i]
+          i += 1
+        }
+      }, speed)
+    },
+    closeNarration() {
+      if (this.typingTimer) { clearInterval(this.typingTimer); this.typingTimer = null }
+      this.showNarration = false
+      this.typingText = ''
+    }
   }
 }
 </script>
