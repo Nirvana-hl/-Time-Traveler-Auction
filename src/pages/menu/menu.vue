@@ -1,5 +1,44 @@
 <template>
   <div class="menu-container">
+    <!-- 首次登录剧情对话 -->
+    <div v-if="showFirstLoginDialogue" class="dialogue-overlay" @click="nextDialogue">
+      <div class="dialogue-container" @click.stop>
+        <!-- 角色立绘 -->
+        <div class="character-portrait" :class="{ 'slide-in-right': currentDialogue.character === '大木博士' || currentDialogue.character === 'Dr. Alina' }">
+          <img :src="currentCharacter.image" :alt="currentDialogue.character" class="character-image" />
+        </div>
+        
+        <!-- 对话框 -->
+        <div class="dialogue-box" :class="{ 'slide-in-left': currentDialogue.character === '大木博士' || currentDialogue.character === 'Dr. Alina' }">
+          <div class="dialogue-header">
+            <span class="character-name" :style="{ color: currentCharacter.color }">{{ currentDialogue.character }}</span>
+            <div class="dialogue-progress">
+              <span class="progress-text">{{ currentDialogueIndex + 1 }}/{{ dialogueConfig.dialogues.length }}</span>
+            </div>
+          </div>
+          <div class="dialogue-content">
+            <p class="dialogue-text" ref="dialogueText">{{ displayedText }}</p>
+          </div>
+          <div class="dialogue-footer">
+            <div class="typing-indicator" v-if="isTyping">
+              <span>●</span>
+              <span>●</span>
+              <span>●</span>
+            </div>
+            <div v-else class="footer-content">
+              <button class="next-button" @click="nextDialogue">
+                {{ isLastDialogue ? dialogueConfig.buttonText : '点击继续' }}
+              </button>
+              <label class="skip-checkbox" v-if="isLastDialogue">
+                <input type="checkbox" v-model="skipDialogue" />
+                <span class="checkbox-label">下次不再显示</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 顶部导航栏 -->
     <nav class="navbar">
       <div class="nav-content">
@@ -144,6 +183,7 @@
 <script>
 import roomService from '../../services/room-service'
 import authService from '../../services/auth-service'
+import { firstLoginDialogue, getCurrentLanguage, shouldSkipDialogue, setSkipDialogue } from '../../config/dialogue-config'
 
 export default {
   name: 'MenuPage',
@@ -152,7 +192,16 @@ export default {
       roomIdInput: '',
       errorMessage: '',
       room: null,
-      refreshTimer: null
+      refreshTimer: null,
+      
+      // 首次登录对话相关状态
+      showFirstLoginDialogue: false,
+      currentDialogueIndex: 0,
+      displayedText: '',
+      isTyping: false,
+      typingTimer: null,
+      currentLanguage: getCurrentLanguage(),
+      skipDialogue: false
     }
   },
   computed: {
@@ -163,14 +212,37 @@ export default {
       return players.length > 0 && players.every(p => !!p.is_ready)
     },
     isOwner() { return this.room && this.$store.state.user && this.room.owner_id === this.$store.state.user.id },
-    canStart() { return this.hasRoom && this.allReady && this.isOwner }
+    canStart() { return this.hasRoom && this.allReady && this.isOwner },
+    
+    // 对话相关计算属性
+    dialogueConfig() {
+      return firstLoginDialogue.languages[this.currentLanguage]
+    },
+    currentDialogue() {
+      return this.dialogueConfig.dialogues[this.currentDialogueIndex]
+    },
+    currentCharacter() {
+      return firstLoginDialogue.characters[this.currentDialogue.character]
+    },
+    isLastDialogue() {
+      return this.currentDialogueIndex === this.dialogueConfig.dialogues.length - 1
+    }
   },
   async mounted() {
-      const user = await authService.getUser()
-      if (user) {
-        console.log('Loaded user:', user) // 调试信息
-        this.$store.commit('SET_USER', user)
+    const user = await authService.getUser()
+    if (user) {
+      console.log('Loaded user:', user) // 调试信息
+      this.$store.commit('SET_USER', user)
+      
+      // 检查是否需要显示对话（每次登录都显示，除非用户选择跳过）
+      if (!shouldSkipDialogue()) {
+        // 延迟显示对话，让页面先加载完成
+        setTimeout(() => {
+          this.showFirstLoginDialogue = true
+          this.startDialogue()
+        }, 1000)
       }
+    }
     this.refreshTimer = setInterval(this.loadRoom, 5000)
     await this.loadRoom()
   },
@@ -178,6 +250,63 @@ export default {
     if (this.refreshTimer) clearInterval(this.refreshTimer)
   },
   methods: {
+    // 对话相关方法
+    startDialogue() {
+      this.currentDialogueIndex = 0
+      this.typeText(this.currentDialogue.text)
+    },
+    
+    typeText(text) {
+      this.isTyping = true
+      this.displayedText = ''
+      let index = 0
+      
+      if (this.typingTimer) {
+        clearInterval(this.typingTimer)
+      }
+      
+      this.typingTimer = setInterval(() => {
+        if (index < text.length) {
+          this.displayedText += text.charAt(index)
+          index++
+        } else {
+          clearInterval(this.typingTimer)
+          this.isTyping = false
+        }
+      }, firstLoginDialogue.animations.textTypingSpeed)
+    },
+    
+    nextDialogue() {
+      if (this.isTyping) {
+        // 如果正在打字，直接显示完整文本
+        clearInterval(this.typingTimer)
+        this.displayedText = this.currentDialogue.text
+        this.isTyping = false
+        return
+      }
+      
+      if (this.isLastDialogue) {
+        // 对话结束
+        this.endDialogue()
+        return
+      }
+      
+      // 下一句对话
+      this.currentDialogueIndex++
+      this.typeText(this.currentDialogue.text)
+    },
+    
+    endDialogue() {
+      // 保存用户的选择状态
+      if (this.skipDialogue) {
+        setSkipDialogue(true)
+      }
+      this.showFirstLoginDialogue = false
+      this.currentDialogueIndex = 0
+      this.displayedText = ''
+      this.skipDialogue = false
+    },
+
     async loadRoom() {
       try {
         const rid = this.$store.state.roomId
@@ -253,9 +382,45 @@ export default {
 
 <style scoped>
 .menu-container {
+  position: relative;
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  overflow: hidden;
   color: #e2e8f0;
+}
+
+/* 固定背景图 */
+.menu-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-image: url('/images/22DF74E40A62E32AEED2DF9D7F66AFF5.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* 渐变覆盖层 */
+.menu-container::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(
+    135deg, 
+    rgba(15, 23, 42, 0.9) 0%, 
+    rgba(30, 41, 59, 0.9) 50%, 
+    rgba(51, 65, 85, 0.9) 100%
+  );
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* 导航栏样式 */
@@ -730,6 +895,215 @@ export default {
 .feature-desc {
   color: #94a3b8;
   line-height: 1.6;
+}
+
+/* 首次登录对话样式 */
+.dialogue-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.dialogue-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+  max-width: 900px;
+  width: 90%;
+  max-height: 90vh;
+}
+
+.character-portrait {
+  flex-shrink: 0;
+  width: 300px;
+  height: 400px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateX(50px);
+}
+
+.character-portrait.slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+.character-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dialogue-box {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateX(-50px);
+}
+
+.dialogue-box.slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+.dialogue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.character-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.dialogue-progress {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.dialogue-content {
+  margin-bottom: 24px;
+  min-height: 120px;
+}
+
+.dialogue-text {
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.dialogue-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 40px;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.skip-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #94a3b8;
+  transition: color 0.3s ease;
+}
+
+.skip-checkbox:hover {
+  color: #e2e8f0;
+}
+
+.skip-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #64748b;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.skip-checkbox input[type="checkbox"]:checked {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.checkbox-label {
+  user-select: none;
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  animation: pulse 1.5s infinite;
+}
+
+.typing-indicator span {
+  color: #3b82f6;
+  font-size: 1.5rem;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.next-button {
+  background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.next-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+}
+
+/* 对话动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* 动画 */
