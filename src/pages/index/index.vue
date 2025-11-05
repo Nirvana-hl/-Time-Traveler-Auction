@@ -1,6 +1,6 @@
 <template>
   <div class="game-container" :class="{ 'post-start': gamePhase !== 'preparation' }">
-    <!-- 游戏状态栏 -->
+    <!-- 顶部状态栏：品牌/用户信息/导航控制（登录、个人中心、准备/开始/商店/退出） -->
     <div class="top-auth-bar">
       <div class="left">
         <span class="brand">时空旅人拍卖会</span>
@@ -35,7 +35,7 @@
       </div>
     </div>
 
-    <!-- 玩家头像（拍卖会上方，可点击查看手牌） -->
+    <!-- 玩家头像区域：展示房间玩家，点击头像可查看该玩家手牌（当前仅展示自己的手牌明细） -->
     <div class="players-avatars" v-if="playerCount > 0 && gamePhase !== 'preparation'">
       <div class="avatar-item" v-for="p in (room ? room.room_players : [])" :key="p.user_id" @click="showPlayerHand(p)">
         <div class="avatar-wrap">
@@ -43,10 +43,11 @@
           <span class="ready-indicator" :class="{ on: !!p.is_ready }"></span>
         </div>
         <div class="player-name">{{ getNameFor(p.user_id) }}</div>
+        <div class="player-value" v-if="getPlayerTotalValue(p.user_id) !== null">价值 {{ getPlayerTotalValue(p.user_id) }}</div>
       </div>
     </div>
 
-    <!-- 拍卖会台（拍卖阶段靠左，其余阶段居中） -->
+    <!-- 拍卖舞台：在不同的 gamePhase 下显示倒计时/间歇/拍卖面板或占位提示 -->
     <div class="auction-stage" :class="{ 'align-left': gamePhase === 'auction' }">
       <!-- 预倒计时阶段（游戏开始后5s预热） -->
       <template v-if="gamePhase === 'countdown'">
@@ -71,7 +72,7 @@
         </div>
       </template>
       
-      <!-- 当 gamePhase 为 'auction' 时显示拍卖面板，包含拍卖物品和倒计时 -->
+      <!-- 拍卖阶段：展示拍卖面板（当前拍品列表、轮次信息、点击卡片触发讲述） -->
       <auction-panel 
         v-else-if="gamePhase === 'auction' && $store.state.currentAuctions && $store.state.currentAuctions.length" 
         :auctions="$store.state.currentAuctions" 
@@ -84,7 +85,7 @@
       <div v-else class="stage-placeholder">拍卖会台空闲，等待新一轮拍卖</div>
     </div>
 
-    <!-- 房间座位（仅在准备阶段显示） -->
+    <!-- 房间座位区（准备阶段）：点击空位入座，已入座玩家显示头像与准备标记 -->
     <div class="seats" v-if="seatCount > 0 && gamePhase === 'preparation'" :style="{ gridTemplateColumns: 'repeat(' + seatCount + ', 1fr)' }">
       <div class="seat" v-for="(seat, idx) in seats" :key="idx" :class="{ occupied: !!seat.player }" @click="moveToSeat(idx)">
         <div class="seat-index">{{ idx + 1 }}/{{ seatCount }}</div>
@@ -101,7 +102,7 @@
       </div>
     </div>
 
-    <!-- 当前玩家手牌（拍卖会下方） -->
+    <!-- 当前玩家手牌：展示自己已拥有的奇物，点击查看详情（或触发讲述） -->
     <div class="my-hand" v-if="gamePhase !== 'preparation'">
       <h3 class="hand-title">我的手牌</h3>
       <div class="hand-grid">
@@ -138,7 +139,7 @@
       </div>
     </div>
 
-    <!-- 收藏集进度面板（左侧） -->
+    <!-- 收藏集进度：仅展示与自己已拥有奇物相关的收藏集，支持展开查看成员清单 -->
     <div class="collections-panel" v-if="gamePhase !== 'preparation'">
       <div class="collections-section">
         <h4 class="collections-title">收藏集进度</h4>
@@ -188,7 +189,7 @@
       </div>
     </div>
 
-    <!-- 聊天 / 日志 面板（右侧） -->
+    <!-- 聊天/日志面板：合并系统日志与聊天消息为统一时间序信息流 -->
     <div class="chat-panel" v-if="gamePhase !== 'preparation'">
       <div class="chat-header">
         <h4 class="chat-title">聊天 / 日志</h4>
@@ -226,7 +227,7 @@
       </div>
     </div>
 
-    <!-- 卡牌详情弹窗 -->
+    <!-- 卡牌详情弹窗：展示所选奇物的核心信息与标签 -->
     <div v-if="showCardDetail" class="card-detail-popup">
       <div class="popup-overlay" @click="hideCardDetail"></div>
       <div class="popup-content" v-if="selectedCard">
@@ -249,18 +250,29 @@
             </span>
           </div>
           <p class="detail-value">基础价值: {{ selectedCard.baseValue }}</p>
-            <div class="detail-actions">
-              <button class="control-button" @click="openNarration">讲述</button>
-            </div>
+            
         </div>
         <button class="close-button" @click="hideCardDetail">关闭</button>
       </div>
     </div>
 
-      <!-- 文物讲述弹层：角色讲述 + 关键信息复述 -->
+      <!-- 文物讲述弹层：以角色对白形式讲述 selectedCard 的关键信息 -->
       <div v-if="showNarration && selectedCard" class="narration-popup">
         <div class="popup-overlay" @click="closeNarration"></div>
         <div class="popup-content narration-content">
+          <!-- 顶部：文物大图与快速元信息，图片下方显示名称 -->
+          <div class="artifact-media" v-if="selectedCard">
+            <img class="artifact-image-large" :src="selectedCard.image || 'https://via.placeholder.com/800x240?text=Artifact'" alt="artifact" />
+            <div class="artifact-quick-meta">
+              <span class="badge era" v-if="selectedCard.era">{{ selectedCard.era }}</span>
+              <span class="badge location" v-if="selectedCard.location">{{ selectedCard.location }}</span>
+              <span class="badge value" v-if="selectedCard.baseValue !== undefined">价值 {{ selectedCard.baseValue }}</span>
+              <span class="badge tags" v-if="(selectedCard.collectionTags || []).length">{{ (selectedCard.collectionTags || []).slice(0,3).join('、') }}</span>
+            </div>
+          </div>
+          <div class="artifact-caption" v-if="selectedCard && selectedCard.name">{{ selectedCard.name }}</div>
+
+          <!-- 下方：人物与对白一行排列 -->
           <div class="narration-dialog">
             <!-- 左侧：角色大图与姓名 -->
             <div class="character-side" :style="{ borderColor: narrationCharacter && narrationCharacter.color ? narrationCharacter.color : '#3b82f6' }">
@@ -272,12 +284,6 @@
             <!-- 右侧：对白气泡 -->
             <div class="speech-side">
               <div class="speech-bubble">
-                <div class="speech-header">
-                  <span class="badge era" v-if="selectedCard.era">{{ selectedCard.era }}</span>
-                  <span class="badge location" v-if="selectedCard.location">{{ selectedCard.location }}</span>
-                  <span class="badge value" v-if="selectedCard.baseValue !== undefined">价值 {{ selectedCard.baseValue }}</span>
-                  <span class="badge tags" v-if="(selectedCard.collectionTags || []).length">{{ (selectedCard.collectionTags || []).join('、') }}</span>
-                </div>
                 <div class="speech-text">{{ typingText }}</div>
               </div>
               <div class="narration-actions">
@@ -288,7 +294,7 @@
         </div>
       </div>
 
-    <!-- 道具商店弹窗 -->
+    <!-- 道具商店弹窗：复用全局商店组件 <item-shop />，与 /shop 页面共用一套逻辑 -->
     <div v-if="showShop" class="shop-popup">
       <div class="popup-overlay" @click="closeShop"></div>
       <div class="popup-content">
@@ -297,7 +303,7 @@
       </div>
     </div>
 
-    <!-- 手牌弹窗 -->
+    <!-- 手牌弹窗：查看某位玩家的手牌缩略（当前仅展示当前玩家持有的真实列表） -->
     <div v-if="showHandPopup" class="hand-popup">
       <div class="popup-overlay" @click="hideHand"></div>
       <div class="popup-content">
@@ -312,7 +318,7 @@
       </div>
     </div>
 
-    <!-- 游戏结束对话框 -->
+    <!-- 游戏结束对话框：展示最终排名与赢家信息，提供回房或去列表的导航 -->
     <div v-if="showGameEndDialog" class="game-end-popup">
       <div class="popup-overlay" @click="closeGameEndDialog"></div>
       <div class="popup-content game-end-content">
@@ -349,7 +355,6 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import AuctionPanel from '../../components/auction-panel/auction-panel.vue'
-import PlayerAvatar from '../../components/player-avatar/player-avatar.vue'
 import ItemShop from '../../components/item-shop/item-shop.vue'
 import roomService from '../../services/room-service'
 import { getSupabase } from '../../services/supabase-client'
@@ -368,7 +373,6 @@ export default {
   name: 'GameIndex',
   components: {
     AuctionPanel,
-    PlayerAvatar,
     ItemShop
   },
   data() {
@@ -451,12 +455,7 @@ export default {
       }
       return phaseMap[this.gamePhase] || '未知阶段'
     },
-    roundPercent() {
-      const cur = Number(this.$store.state.roundCurrent || 0)
-      const tot = Number(this.$store.state.roundTotal || 6)
-      if (tot <= 0) return 0
-      return Math.min(100, Math.max(0, Math.round((cur / tot) * 100)))
-    },
+   
 
     // 根据当前用户手牌计算收藏集显示数据，带缓存字段，便于模板直接引用
     collectionsComputed() {
@@ -771,6 +770,18 @@ export default {
       this.$store.commit('SET_SHOW_CARD_DETAIL', false)
       this.openNarration()
     },
+    // 计算头像下方显示的当前玩家总价值（仅对当前用户显示，其他玩家返回 null）
+    getPlayerTotalValue(userId) {
+      const current = this.$store.state.currentPlayer
+      if (!current || current.id !== userId) return null
+      const owned = Array.isArray(this.$store.state.playerArtifacts) ? this.$store.state.playerArtifacts : []
+      let total = 0
+      owned.forEach(aid => {
+        const a = this.artifactMap[aid]
+        if (a && typeof a.baseValue === 'number') total += a.baseValue
+      })
+      return total
+    },
 
     showPlayerHand(player) {
       // 构造玩家对象，包含手牌信息
@@ -789,10 +800,7 @@ export default {
       this.showHandPopup = false
     },
     
-    formatTime(timestamp) {
-      const date = new Date(timestamp)
-      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
-    },
+    
     getAvatarFor(userId) { return getAvatarForHelper({ profileMap: this.profileMap, userId }) },
     getNameFor(userId) { return getNameForHelper({ profileMap: this.profileMap, room: this.room, userId }) },
     getCurrentLanguage() { return getCurrentLanguageImported() },
@@ -803,25 +811,14 @@ export default {
       catch (error) { console.error('加载收藏集数据失败:', error); this.collections = [] }
     },
     
-    // 检查收藏集是否完成
-    isCollectionCompleted(collection) {
-      const owned = (this.currentPlayer && this.currentPlayer.artifacts) ? this.currentPlayer.artifacts : []
-      const currentCount = getCollectionCountUtil({ artifactMap: this.artifactMap, ownedArtifactIds: owned, collection })
-      return currentCount >= collection.requiredCount
-    },
+   
     
     // 获取当前收藏集数量（基于当前用户手牌，且受最大要求数上限限制）
     getCurrentCollectionCount(collection) {
       const owned = (this.currentPlayer && this.currentPlayer.artifacts) ? this.currentPlayer.artifacts : []
       return getCollectionCountUtil({ artifactMap: this.artifactMap, ownedArtifactIds: owned, collection })
     },
-    
-    // 获取收藏集进度百分比
-    getCollectionProgress(collection) {
-      const current = this.getCurrentCollectionCount(collection)
-      const required = collection.requiredCount
-      return getCollectionProgressUtil({ current, required })
-    },
+
 
     // 展开/收起收藏集
     toggleCollection(collection) {
