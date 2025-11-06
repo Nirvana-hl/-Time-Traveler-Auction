@@ -85,9 +85,21 @@ export async function autoStartAuction({
   } catch (_) {}
 
   if (roomId) {
-    await supabase.channel(`room_cast_${roomId}`).send({ type: 'broadcast', event: 'auction_started', payload: { artifacts: picks, duration: 30 } })
     const current = Number(store.state.roundCurrent || 0)
     const total = Number(store.state.roundTotal || 6)
+    
+    // 广播拍卖开始，包含回合数信息，确保所有玩家都能看到当前回合
+    await supabase.channel(`room_cast_${roomId}`).send({ 
+      type: 'broadcast', 
+      event: 'auction_started', 
+      payload: { 
+        artifacts: picks, 
+        duration: 30,
+        roundCurrent: current,
+        roundTotal: total
+      } 
+    })
+    
     // 结束条件：达到总回合数
     if (current >= total) {
       try { await supabase.from('rooms').update({ status: 'ended' }).eq('id', roomId) } catch (_) {}

@@ -43,7 +43,7 @@
           <span class="ready-indicator" :class="{ on: !!p.is_ready }"></span>
         </div>
         <div class="player-name">{{ getNameFor(p.user_id) }}</div>
-        <div class="player-value" v-if="getPlayerTotalValue(p.user_id) !== null">价值 {{ getPlayerTotalValue(p.user_id) }}</div>
+        <div class="player-value">价值 {{ getPlayerTotalValue(p.user_id) }}</div>
       </div>
     </div>
 
@@ -401,7 +401,9 @@ export default {
       expandedCollections: {},
       showNarration: false,
       typingText: '',
-      typingTimer: null
+      typingTimer: null,
+      // 存储所有玩家的手牌数据，用于价值计算
+      allPlayersArtifacts: {}
     }
   },
   computed: {
@@ -499,6 +501,7 @@ export default {
     if (roomId) this.$store.commit('SET_ROOM_ID', roomId)
     await this.initializeGame()
     await this.loadRoomState()
+    // loadRoomState 中已经调用了 loadAllPlayersArtifacts，这里确保数据加载
     await this.subscribeRoomRealtime()
   },
   beforeDestroy() {
@@ -534,6 +537,14 @@ export default {
             // 防止重复启动多个倒计时
             if (this.countdownInProgress) return
             this.countdownInProgress = true
+            
+            // 新局开始：重置聊天消息和价值数据
+            this.chatMessages = []
+            this.allPlayersArtifacts = {}
+            // 重置回合数
+            this.$store.commit('RESET_ROUND')
+            this.$store.commit('SET_ROUND_TOTAL', 6)
+            
             this.$store.commit('SET_GAME_PHASE', 'countdown')
             this.$set(this, 'auctionCountdown', 5)
             const me = (this.room && this.room.room_players ? this.room.room_players : []).find(p => p.user_id === this.$store.state.user.id)
@@ -551,7 +562,20 @@ export default {
               })
             })
           },
-          onAuctionStarted: (duration) => { this.startAuctionTimer(duration) },
+          onAuctionStarted: async (duration, payload) => { 
+            // 确保所有玩家都能看到拍卖数据
+            await this.loadRoomState()
+            
+            // 同步回合数（如果广播中包含了回合信息）
+            if (payload && typeof payload.roundCurrent === 'number') {
+              this.$store.commit('SET_ROUND_CURRENT', payload.roundCurrent)
+            }
+            if (payload && typeof payload.roundTotal === 'number') {
+              this.$store.commit('SET_ROUND_TOTAL', payload.roundTotal)
+            }
+            
+            this.startAuctionTimer(duration) 
+          },
           onBidUpdate: ({ auctionId, highestBid, highestBidder }) => {
             if (!auctionId) return
             const list = this.$store.state.currentAuctions || []
@@ -570,6 +594,11 @@ export default {
           },
           onAuctionEnded: async () => { await this.loadRoomState() },
           onChatMessage: (message) => {
+            // 避免重复添加消息
+            if (!message || !message.id) return
+            const existing = this.chatMessages.find(m => m.id === message.id || (m.userId === message.userId && m.timestamp === message.timestamp && m.content === message.content))
+            if (existing) return
+            
             this.chatMessages.push(message)
             this.$nextTick(() => {
               const chatContainer = this.$refs.chatContainer
@@ -603,6 +632,44 @@ export default {
         setAuctionCountdown: (n) => { this.$set(this, 'auctionCountdown', n) },
         onShowGameEnd: () => { this.showGameEndDialog = true; setTimeout(() => { this.handleGameEnd() }, 3000) },
       })
+      // 加载所有玩家的手牌数据，用于价值计算
+      await this.loadAllPlayersArtifacts()
+    },
+    
+    // 加载所有玩家的手牌数据
+    async loadAllPlayersArtifacts() {
+      try {
+        const rid = this.$store.state.roomId
+        if (!rid) {
+          this.allPlayersArtifacts = {}
+          return
+        }
+        
+        const supabase = getSupabase()
+        // 获取房间内所有玩家的手牌数据
+        const { data: allArtifacts } = await supabase
+          .from('room_artifacts')
+          .select('owner_user_id, artifact_id')
+          .eq('room_id', rid)
+        
+        // 按玩家ID分组
+        const playerArtifactsMap = {}
+        if (allArtifacts && allArtifacts.length > 0) {
+          allArtifacts.forEach(row => {
+            const userId = row.owner_user_id
+            if (!playerArtifactsMap[userId]) {
+              playerArtifactsMap[userId] = []
+            }
+            playerArtifactsMap[userId].push(row.artifact_id)
+          })
+        }
+        
+        // 使用 Vue.set 确保响应式更新
+        this.$set(this, 'allPlayersArtifacts', playerArtifactsMap)
+      } catch (e) {
+        console.warn('[game] loadAllPlayersArtifacts failed', e)
+        this.allPlayersArtifacts = {}
+      }
     },
     async toggleReady() {
       try {
@@ -666,8 +733,10 @@ export default {
         const rid = this.$store.state.roomId
         const uid = this.$store.state.user && this.$store.state.user.id
         if (!rid || !uid || !this.isOwner || !this.allReady) return
-        // 新局开始前重置系统日志
+        // 新局开始前重置系统日志、聊天消息和价值数据
         try { this.$store.commit('CLEAR_GAME_LOG') } catch (_) {}
+        this.chatMessages = []
+        this.allPlayersArtifacts = {}
         await roomService.startGame(rid, uid)
         const supabase = getSupabase()
         this.roundCount = 0
@@ -690,6 +759,9 @@ export default {
         // 房主本地也启动预倒计时，防止广播不回传导致不触发 onGameStarted
         if (!this.countdownInProgress) {
           this.countdownInProgress = true
+          // 确保本地也重置数据
+          this.chatMessages = []
+          this.allPlayersArtifacts = {}
           this.$store.commit('SET_GAME_PHASE', 'countdown')
           this.$set(this, 'auctionCountdown', 5)
           const me = (this.room && this.room.room_players ? this.room.room_players : []).find(p => p.user_id === uid)
@@ -770,15 +842,33 @@ export default {
       this.$store.commit('SET_SHOW_CARD_DETAIL', false)
       this.openNarration()
     },
-    // 计算头像下方显示的当前玩家总价值（仅对当前用户显示，其他玩家返回 null）
+    // 计算玩家总价值（支持所有玩家）
     getPlayerTotalValue(userId) {
-      const current = this.$store.state.currentPlayer
-      if (!current || current.id !== userId) return null
-      const owned = Array.isArray(this.$store.state.playerArtifacts) ? this.$store.state.playerArtifacts : []
+      if (!userId) return 0
+      
+      // 优先从 allPlayersArtifacts 获取所有玩家的手牌数据
+      let owned = []
+      if (this.allPlayersArtifacts && this.allPlayersArtifacts[userId]) {
+        owned = Array.isArray(this.allPlayersArtifacts[userId]) ? this.allPlayersArtifacts[userId] : []
+      } else {
+        // 回退：如果 allPlayersArtifacts 中没有，尝试从当前玩家数据获取
+        const current = this.$store.state.currentPlayer
+        if (current && current.id === userId) {
+          owned = Array.isArray(this.$store.state.playerArtifacts) ? this.$store.state.playerArtifacts : []
+        }
+      }
+      
+      if (!owned || owned.length === 0) return 0
+      
+      // 确保 artifactMap 已加载
+      if (!this.artifactMap || Object.keys(this.artifactMap).length === 0) return 0
+      
       let total = 0
       owned.forEach(aid => {
         const a = this.artifactMap[aid]
-        if (a && typeof a.baseValue === 'number') total += a.baseValue
+        if (a && typeof a.baseValue === 'number') {
+          total += a.baseValue
+        }
       })
       return total
     },
@@ -934,11 +1024,34 @@ export default {
     // 发送聊天消息
     async sendMessage() {
       if (!this.newMessage.trim() || !this.user) return
-      const message = { id: Date.now(), userId: this.user.id, username: this.getNameFor(this.user.id), content: this.newMessage.trim(), timestamp: Date.now() }
+      const message = { 
+        id: Date.now(), 
+        userId: this.user.id, 
+        username: this.getNameFor(this.user.id), 
+        content: this.newMessage.trim(), 
+        timestamp: Date.now() 
+      }
+      // 本地立即显示，提供即时反馈
       this.chatMessages.push(message)
       this.newMessage = ''
+      
+      // 滚动到底部
+      this.$nextTick(() => {
+        const chatContainer = this.$refs.chatContainer
+        if (chatContainer) { chatContainer.scrollTop = chatContainer.scrollHeight }
+      })
+      
+      // 发送到服务器，广播给所有玩家
       const rid = this.$store.state.roomId
-      if (rid) { try { const supabase = getSupabase(); await sendChatMessage({ supabase, roomId: rid, message }) } catch (e) { console.warn('[game] sendMessage failed', e) } }
+      if (rid) { 
+        try { 
+          const supabase = getSupabase()
+          await sendChatMessage({ supabase, roomId: rid, message }) 
+        } catch (e) { 
+          console.warn('[game] sendMessage failed', e)
+          // 发送失败时，可以选择移除本地消息或保留（保留提供更好的用户体验）
+        } 
+      }
     },
     
     // 格式化消息时间

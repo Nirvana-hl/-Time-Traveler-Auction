@@ -24,6 +24,7 @@ export function subscribeRoomRealtime({ roomId, supabase, onLoadRoomState }, han
     .channel(`room_db_${roomId}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'room_players', filter: `room_id=eq.${roomId}` }, async () => { await onLoadRoomState() })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'room_artifacts', filter: `room_id=eq.${roomId}` }, async () => { await onLoadRoomState() })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'auctions', filter: `room_id=eq.${roomId}` }, async () => { await onLoadRoomState() })
     .on('postgres_changes', { event: 'update', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, async () => { await onLoadRoomState() })
     .subscribe()
 
@@ -34,7 +35,11 @@ export function subscribeRoomRealtime({ roomId, supabase, onLoadRoomState }, han
     .on('broadcast', { event: 'game_started' }, async (payload) => { handlers.onGameStarted && handlers.onGameStarted(payload) })
     .on('broadcast', { event: 'auction_started' }, async (payload) => {
       const duration = Number(payload && payload.payload && payload.payload.duration) || 30
-      handlers.onAuctionStarted && handlers.onAuctionStarted(duration)
+      const roundData = payload && payload.payload ? {
+        roundCurrent: payload.payload.roundCurrent,
+        roundTotal: payload.payload.roundTotal
+      } : null
+      handlers.onAuctionStarted && handlers.onAuctionStarted(duration, roundData)
     })
     .on('broadcast', { event: 'auction_bid_update' }, async (payload) => {
       const data = (payload && payload.payload) || {}

@@ -44,7 +44,7 @@ export async function loadRoomState({
       store.commit('SET_CURRENT_AUCTIONS', [])
     }
 
-    // playing -> 同步活跃拍卖
+    // playing -> 同步活跃拍卖（所有玩家都应该看到）
     if (room && room.status === 'playing') {
       try {
         const { data: dbAuctions } = await supabase
@@ -53,10 +53,17 @@ export async function loadRoomState({
           .eq('status', 'active')
           .eq('room_id', roomId)
 
-        const existingIds = new Set((store.state.currentAuctions || []).map(a => a.id))
+        // 同步所有活跃拍卖，使用 ADD_OR_UPDATE_AUCTION 确保更新已存在的拍卖
+        const dbAuctionIds = new Set()
+        const auctionsToSync = []
+        
         for (const row of (dbAuctions || [])) {
-          if (existingIds.has(row.id)) continue
-          const artifact = row.artifact || artifactMap[row.artifact_id] || { id: row.artifact_id, name: row.artifact_id }
+          dbAuctionIds.add(row.id)
+          // 优先使用 artifactMap，如果没有则从 row.artifact 获取，最后使用默认值
+          let artifact = artifactMap && artifactMap[row.artifact_id] 
+            ? artifactMap[row.artifact_id]
+            : (row.artifact || { id: row.artifact_id, name: row.artifact_id })
+          
           const auction = {
             id: row.id,
             artifact,
@@ -68,10 +75,20 @@ export async function loadRoomState({
             status: 'active',
             _timer: null
           }
-          store.commit('ADD_OR_UPDATE_AUCTION', auction)
+          auctionsToSync.push(auction)
         }
-        if ((dbAuctions || []).length > 0) {
+        
+        // 批量同步所有拍卖，确保所有玩家都能看到
+        auctionsToSync.forEach(auction => {
+          store.commit('ADD_OR_UPDATE_AUCTION', auction)
+        })
+        
+        // 如果有活跃拍卖，确保阶段设置为 auction
+        if (auctionsToSync.length > 0) {
           setGamePhase('auction')
+        } else {
+          // 如果没有活跃拍卖，但房间状态是 playing，可能是其他阶段
+          // 不强制设置 gamePhase，让其他逻辑处理
         }
       } catch (e) {
         console.warn('[room-state] sync active auctions failed', e)
