@@ -53,8 +53,13 @@ export async function autoStartAuction({
   const artifacts = await loadArtifacts()
   if (!(artifacts && artifacts.length)) return
 
+  // 随机抽取 2-6 件（不超过可用数量），且不与当前活动拍卖重复
+  const desiredMin = 3
+  const desiredMax = 9
+  const desiredCount = Math.min(desiredMax, Math.max(desiredMin, Math.floor(Math.random() * (desiredMax - desiredMin + 1)) + desiredMin))
+  const targetCount = Math.min(desiredCount, artifacts.length)
   const picks = []
-  while (picks.length < Math.min(2, artifacts.length)) {
+  while (picks.length < targetCount) {
     const candidate = artifacts[Math.floor(Math.random() * artifacts.length)]
     if (!picks.find(p => p.id === candidate.id)) picks.push(candidate)
   }

@@ -634,6 +634,20 @@ export default {
       })
       // 加载所有玩家的手牌数据，用于价值计算
       await this.loadAllPlayersArtifacts()
+      // 如果刷新后发现仍有活跃拍卖，但本地无倒计时，则用当前剩余时间启动统一倒计时
+      const auctions = this.$store.state.currentAuctions || []
+      if (this.$store.state.gamePhase === 'auction' && auctions.length > 0) {
+        const remaining = Number(this.auctionCountdown || 0)
+        if (!this.auctionTimer && remaining > 0) {
+          startCountdown({
+            seconds: remaining,
+            onTick: (s) => { this.$set(this, 'auctionCountdown', s); },
+            onDone: async () => { await this.onAuctionTimeUp() },
+            getRef: () => this.auctionTimer,
+            setRef: (id) => { this.auctionTimer = id },
+          })
+        }
+      }
     },
     
     // 加载所有玩家的手牌数据

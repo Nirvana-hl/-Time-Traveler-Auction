@@ -187,8 +187,16 @@ export default {
     },
     
     getBidderName(playerId) {
-      const player = this.players.find(p => p.id === playerId)
-      return player ? player.name : '未知玩家'
+      // 优先使用父组件提供的名称解析（基于 profiles/room 更准确）
+      if (this.$parent && typeof this.$parent.getNameFor === 'function') {
+        const name = this.$parent.getNameFor(playerId)
+        if (name && typeof name === 'string') return name
+      }
+      // 其次回退到本地 players（旧结构）
+      const player = Array.isArray(this.players) ? this.players.find(p => p.id === playerId) : null
+      if (player && player.name) return player.name
+      // 最后回退为ID前缀，避免“未知玩家”
+      return (playerId || '').slice(0, 6) || '玩家'
     },
     
     getBidderAvatar(playerId) {
@@ -279,12 +287,37 @@ export default {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+  /* 当拍卖卡片很多时，使用内部滚动，不拉长页面 */
+  overflow-y: auto;
+  max-height: 58vh; /* 留出顶部区域空间 */
+  padding-right: 0px; /* 给滚动条留出一点空间，避免遮挡内容 */
+  -webkit-overflow-scrolling: touch;
+  /* Firefox 自定义滚动条 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 @media (max-width: 1200px) {
   .auction-list { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 720px) {
   .auction-list { grid-template-columns: 1fr; }
+}
+
+/* WebKit 自定义滚动条（Chromium / Safari） */
+.auction-list::-webkit-scrollbar {
+  width: 8px;
+}
+.auction-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.auction-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(59,130,246,0.35), rgba(139,92,246,0.35));
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.auction-list:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(59,130,246,0.55), rgba(139,92,246,0.55));
 }
 .auction-card {
   background: linear-gradient(135deg, #0f172a, #1e293b);
@@ -297,6 +330,8 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  /* 固定拍卖内容可视高度，内部滚动，避免整页拉长 */
+  max-height: 60vh;
 }
 .player-energy { color:#e2e8f0; font-weight:600; }
 .auction-item {
@@ -329,13 +364,20 @@ export default {
 .artifact-image-container {
   position: relative;
   flex-shrink: 0;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b1220;
+  border-radius: 12px;
 }
 
 .auction-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 12px;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
   border: 2px solid #4b5563;
   position: relative;
   z-index: 1;
@@ -465,12 +507,13 @@ export default {
 }
 
 .bid-input-group {
-  flex: 0 0 200px;
-  max-width: 240px;
+  /* 自适应，不超出卡片可用宽度 */
+  flex: 1 1 180px;
+  max-width: 100%;
   position: relative;
 }
 @media (min-width: 1280px) {
-  .bid-input-group { flex-basis: 240px; }
+  .bid-input-group { flex-basis: 220px; }
 }
 
 .input-icon {
@@ -490,6 +533,7 @@ export default {
   border: 1px solid #334155;
   border-radius: 12px;
   padding: 0 16px 0 32px;
+  box-sizing: border-box; /* 确保边框与内边距不导致超宽 */
   color: #e2e8f0;
   font-size: 16px;
   outline: none;

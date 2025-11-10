@@ -57,6 +57,7 @@ export async function loadRoomState({
         const dbAuctionIds = new Set()
         const auctionsToSync = []
         
+        let minRemaining = null
         for (const row of (dbAuctions || [])) {
           dbAuctionIds.add(row.id)
           // 优先使用 artifactMap，如果没有则从 row.artifact 获取，最后使用默认值
@@ -64,14 +65,22 @@ export async function loadRoomState({
             ? artifactMap[row.artifact_id]
             : (row.artifact || { id: row.artifact_id, name: row.artifact_id })
           
+          // 基于 created_at 与 time_remaining 计算剩余时间（time_remaining 视为总时长）
+          const createdAt = row.created_at ? new Date(row.created_at).getTime() : Date.now()
+          const total = (typeof row.time_remaining === 'number' && row.time_remaining > 0) ? row.time_remaining : 30
+          const elapsed = Math.floor((Date.now() - createdAt) / 1000)
+          const remaining = Math.max(0, total - elapsed)
+          if (minRemaining === null) minRemaining = remaining
+          else minRemaining = Math.min(minRemaining, remaining)
+
           const auction = {
             id: row.id,
             artifact,
             highestBid: row.highest_bid || 0,
             highestBidder: row.highest_bidder || null,
-            timeRemaining: typeof row.time_remaining === 'number' ? row.time_remaining : 30,
+            timeRemaining: remaining,
             bids: [],
-            startTime: Date.now(),
+            startTime: createdAt,
             status: 'active',
             _timer: null
           }
@@ -83,9 +92,12 @@ export async function loadRoomState({
           store.commit('ADD_OR_UPDATE_AUCTION', auction)
         })
         
-        // 如果有活跃拍卖，确保阶段设置为 auction
+        // 如果有活跃拍卖，确保阶段设置为 auction，并设置统一倒计时
         if (auctionsToSync.length > 0) {
           setGamePhase('auction')
+          if (typeof minRemaining === 'number' && minRemaining > 0) {
+            setAuctionCountdown && setAuctionCountdown(minRemaining)
+          }
         } else {
           // 如果没有活跃拍卖，但房间状态是 playing，可能是其他阶段
           // 不强制设置 gamePhase，让其他逻辑处理
