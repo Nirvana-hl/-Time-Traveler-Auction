@@ -286,7 +286,7 @@ export default {
 .auction-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 1px;
   /* 当拍卖卡片很多时，使用内部滚动，不拉长页面 */
   overflow-y: auto;
   max-height: 58vh; /* 留出顶部区域空间 */
