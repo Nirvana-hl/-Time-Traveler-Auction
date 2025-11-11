@@ -12,22 +12,13 @@ export const firstLoginDialogue = {
         },
         {
           character: '大木博士',
-          text: '在20xx年,我们意外发现了这个连接各个时代的时空裂隙,里面有来自不同平行宇宙的人参加的拍卖会。',
+          text: '在20xx年,我们意外发现了这个连接各个时代的时空裂隙,里面有来自不同平行宇宙的人参加的拍卖会。现在，你将参与这场跨越千年的珍品拍卖会，收集来自不同时代的独特宝物,将它们带回来。',
           emotion: 'explain'
         },
+
         {
           character: '大木博士',
-          text: '现在，你将参与这场跨越千年的珍品拍卖会，收集来自不同时代的独特宝物,将它们带回来。',
-          emotion: 'excited'
-        },
-        {
-          character: '大木博士',
-          text: '但要小心，神秘组织正试图参加拍卖行，带走高价值的宝物。我们需要你的帮助！',
-          emotion: 'serious'
-        },
-        {
-          character: '大木博士',
-          text: '运用你的拍卖技巧，尽可能待会最高价值的宝物回来，你准备好了吗',
+          text: '但要小心，神秘组织正试图参加拍卖行，带走高价值的宝物。我们需要你的帮助！，运用你的拍卖技巧，尽可能待会最高价值的宝物回来，你准备好了吗',
           emotion: 'challenge'
         }
       ],
@@ -75,6 +66,16 @@ export const firstLoginDialogue = {
     },
     'Dr. Alina': {
       image: '/images/guide.png',
+      position: 'right',
+      color: '#3b82f6'
+    },
+    '美里': {
+      image: '/images/juese.png',
+      position: 'right',
+      color: '#3b82f6'
+    },
+    'Misato': {
+      image: '/images/juese.png',
       position: 'right',
       color: '#3b82f6'
     }

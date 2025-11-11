@@ -235,7 +235,8 @@ export default {
       this.$store.commit('SET_USER', user)
       
       // 检查是否需要显示对话（每次登录都显示，除非用户选择跳过）
-      if (!shouldSkipDialogue()) {
+      const skipDialogue = localStorage.getItem('time_traveler_dialogue_skip') === 'true'
+      if (!skipDialogue) {
         // 延迟显示对话，让页面先加载完成
         setTimeout(() => {
           this.showFirstLoginDialogue = true
@@ -299,7 +300,7 @@ export default {
     endDialogue() {
       // 保存用户的选择状态
       if (this.skipDialogue) {
-        setSkipDialogue(true)
+        localStorage.setItem('time_traveler_dialogue_skip', 'true')
       }
       this.showFirstLoginDialogue = false
       this.currentDialogueIndex = 0

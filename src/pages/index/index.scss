@@ -123,8 +123,56 @@
 }
 .top-auth-bar .brand { font-weight: 600; color: #334155; }
 .top-auth-bar .right { display: flex; align-items: center; gap: 8px; }
-.nav-button { background: #eaecef; border-radius: 8px; padding: 6px 10px; }
-.nav-button.primary { background: #3b82f6; color: #fff; }
+.nav-button { 
+  background: #eaecef; 
+  border-radius: 8px; 
+  padding: 6px 10px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: #d1d5db;
+    transform: translateY(-1px);
+  }
+}
+.nav-button.primary { 
+  background: #3b82f6; 
+  color: #fff;
+  
+  &:hover {
+    background: #2563eb;
+  }
+}
+
+// 音乐控制按钮特殊样式
+.nav-button.music-control {
+  background: rgba(255, 255, 255, 0.15);
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  
+  &.music-playing {
+    background: rgba(76, 175, 80, 0.3);
+    
+    &:hover {
+      background: rgba(76, 175, 80, 0.4);
+    }
+  }
+  
+  .music-icon {
+    font-size: 14px;
+  }
+  
+  .music-text {
+    font-size: 12px;
+  }
+}
 
 .game-status {
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
@@ -336,6 +384,340 @@
   text-align: center;
   position: relative;
   z-index: 1;
+}
+
+/* 准备阶段文物轮播样式 - 增强版 */
+.preparation-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.artifact-carousel-container {
+  width: 100%;
+  max-width: 900px;
+  padding: 30px;
+  position: relative;
+}
+
+.carousel-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.carousel-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
+  text-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  animation: titleGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes titleGlow {
+  0% { text-shadow: 0 4px 8px rgba(59, 130, 246, 0.3); }
+  100% { text-shadow: 0 8px 16px rgba(139, 92, 246, 0.5); }
+}
+
+.carousel-subtitle {
+  color: #94a3b8;
+  font-size: 1.2rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.artifact-carousel {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: 
+    linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98)),
+    radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.15), transparent 60%),
+    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.15), transparent 60%);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 
+    0 30px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.artifact-carousel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(600px circle at 20% 20%, rgba(59, 130, 246, 0.1), transparent 50%),
+    radial-gradient(400px circle at 80% 80%, rgba(139, 92, 246, 0.1), transparent 50%);
+  pointer-events: none;
+}
+
+.carousel-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.carousel-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.artifact-slide-content {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+  padding: 50px;
+  width: 100%;
+  height: 100%;
+}
+
+.artifact-image-container {
+  flex: 0 0 350px;
+  height: 250px;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    0 8px 16px rgba(59, 130, 246, 0.2);
+  transform: perspective(1000px) rotateY(-5deg);
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.artifact-image-container:hover {
+  transform: perspective(1000px) rotateY(0deg) scale(1.02);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.5),
+    0 12px 24px rgba(59, 130, 246, 0.3);
+}
+
+.artifact-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.artifact-image:hover {
+  transform: scale(1.08);
+}
+
+.artifact-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.1) 0%, 
+    rgba(139, 92, 246, 0.05) 50%, 
+    rgba(236, 72, 153, 0.02) 100%);
+  pointer-events: none;
+}
+
+.artifact-info {
+  flex: 1;
+  color: #e2e8f0;
+}
+
+.artifact-name {
+  font-size: 2.2rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.artifact-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.artifact-era, .artifact-location {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(139, 92, 246, 0.25));
+  padding: 8px 16px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.artifact-era:hover, .artifact-location:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(139, 92, 246, 0.35));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.artifact-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+  padding: 12px 20px;
+  border-radius: 15px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  display: inline-block;
+  backdrop-filter: blur(10px);
+  animation: valuePulse 2s ease-in-out infinite;
+}
+
+@keyframes valuePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.carousel-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  color: #e2e8f0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.8rem;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 10;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.carousel-nav:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(139, 92, 246, 0.4));
+  border-color: rgba(59, 130, 246, 0.8);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
+}
+
+.carousel-prev {
+  left: 30px;
+}
+
+.carousel-next {
+  right: 30px;
+}
+
+.carousel-indicators {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(20px);
+  border-radius: 25px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.indicator-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.6);
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.indicator-dot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.6s ease;
+}
+
+.indicator-dot.active {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  transform: scale(1.3);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+}
+
+.indicator-dot.active::before {
+  left: 100%;
+}
+
+.indicator-dot:hover {
+  background: #60a5fa;
+  transform: scale(1.2);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .artifact-carousel-container {
+    padding: 20px;
+    max-width: 100%;
+  }
+  
+  .artifact-carousel {
+    height: 400px;
+  }
+  
+  .artifact-slide-content {
+    flex-direction: column;
+    gap: 30px;
+    padding: 30px;
+    text-align: center;
+  }
+  
+  .artifact-image-container {
+    flex: 0 0 250px;
+    height: 180px;
+  }
+  
+  .artifact-name {
+    font-size: 1.8rem;
+  }
+  
+  .carousel-nav {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+  
+  .carousel-prev {
+    left: 15px;
+  }
+  
+  .carousel-next {
+    right: 15px;
+  }
 }
 
 .my-hand { 

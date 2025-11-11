@@ -7,6 +7,11 @@
       </div>
       <div class="right" v-if="user">
         <span class="user-email">{{ user.email }}</span>
+        <!-- 音乐控制按钮 -->
+        <button class="nav-button music-control" @click="toggleMusic" :class="{ 'music-playing': isMusicPlaying }">
+          <span class="music-icon">{{ isMusicPlaying ? '🔊' : '🔇' }}</span>
+          <span class="music-text">{{ isMusicPlaying ? '音乐' : '静音' }}</span>
+        </button>
         <button class="nav-button" @click="$router.push('/profile')">个人中心</button>
       </div>
       <div class="right" v-else>
@@ -75,6 +80,66 @@
         :round-total="$store.state.roundTotal"
         @artifact-click="showArtifactDetailFromAuction" 
       />
+      <!-- 准备阶段：显示文物照片自动滑动展示 -->
+      <div v-else-if="gamePhase === 'preparation'" class="preparation-stage">
+        <div class="artifact-carousel-container">
+          <div class="carousel-header">
+            <h3 class="carousel-title">时空珍宝预览</h3>
+            <p class="carousel-subtitle">准备阶段 - 即将拍卖的珍贵文物</p>
+          </div>
+          
+          <div class="artifact-carousel">
+            <div class="carousel-track" :style="{ transform: `translateX(-${currentSlide * 100}%)` }">
+              <div 
+                v-for="(artifact, index) in artifactCarouselData" 
+                :key="index" 
+                class="carousel-slide"
+              >
+                <div class="artifact-slide-content">
+                  <div class="artifact-image-container">
+                    <img 
+                      class="artifact-image" 
+                      :src="artifact.image || 'https://via.placeholder.com/400x300?text=文物预览'" 
+                      :alt="artifact.name"
+                      @error="handleImageError(artifact)"
+                    />
+                    <div class="artifact-overlay"></div>
+                  </div>
+                  <div class="artifact-info">
+                    <h4 class="artifact-name">{{ artifact.name || '未知文物' }}</h4>
+                    <div class="artifact-meta">
+                      <span class="artifact-era" v-if="artifact.era">{{ artifact.era }}</span>
+                      <span class="artifact-location" v-if="artifact.location">{{ artifact.location }}</span>
+                    </div>
+                    <p class="artifact-value" v-if="artifact.baseValue !== undefined">
+                      基础价值: {{ artifact.baseValue }} ⚡
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 轮播控制按钮 -->
+            <button class="carousel-nav carousel-prev" @click="prevSlide">
+              <span>‹</span>
+            </button>
+            <button class="carousel-nav carousel-next" @click="nextSlide">
+              <span>›</span>
+            </button>
+            
+            <!-- 轮播指示器 -->
+            <div class="carousel-indicators">
+              <span 
+                v-for="(artifact, index) in (artifactCarouselData || []).slice(0, 5)" 
+                :key="index" 
+                class="indicator-dot"
+                :class="{ active: artifactCarouselData && artifactCarouselData.length > 0 && currentSlide % artifactCarouselData.length === index }"
+                @click="goToSlide(index)"
+              ></span>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- 其他情况显示占位提示 -->
       <div v-else class="stage-placeholder">拍卖会台空闲，等待新一轮拍卖</div>
     </div>
@@ -387,7 +452,15 @@ export default {
       typingText: '',
       typingTimer: null,
       // 存储所有玩家的手牌数据，用于价值计算
-      allPlayersArtifacts: {}
+      allPlayersArtifacts: {},
+      // 文物轮播相关数据
+      artifactCarouselData: [],
+      currentSlide: 0,
+      carouselInterval: null,
+      // 音乐控制相关数据
+      isMusicPlaying: false,
+      audioElement: null,
+      musicVolume: 0.5
     }
   },
   computed: {
@@ -472,7 +545,7 @@ export default {
     // 暴露对话配置供模板使用
     firstLoginConfig() { return firstLoginDialogueConfig },
     // 当前讲述角色配置与名称
-    narrationCharacterName() { return (this.getCurrentLanguage() === 'zh-CN') ? '大木博士' : 'Dr. Alina' },
+    narrationCharacterName() { return (this.getCurrentLanguage() === 'zh-CN') ? '美里' : 'Misato' },
     narrationCharacter() {
       const key = this.narrationCharacterName
       const chars = firstLoginDialogueConfig && firstLoginDialogueConfig.characters
@@ -484,14 +557,21 @@ export default {
     if (roomId) this.$store.commit('SET_ROOM_ID', roomId)
     await this.initializeGame()
     await this.loadRoomState()
+    // 立即初始化文物轮播数据，确保准备阶段就有内容
+    await this.initializeArtifactCarousel()
     // loadRoomState 中已经调用了 loadAllPlayersArtifacts，这里确保数据加载
     await this.subscribeRoomRealtime()
+    // 初始化音乐播放器
+    this.initializeMusic()
   },
   beforeDestroy() {
     this.unsubscribeRoomRealtime()
     if (this.refreshTimer) { clearInterval(this.refreshTimer); this.refreshTimer = null }
     if (this.auctionTimer) { clearInterval(this.auctionTimer); this.auctionTimer = null }
     if (this.typingTimer) { clearInterval(this.typingTimer); this.typingTimer = null }
+    if (this.carouselInterval) { clearInterval(this.carouselInterval); this.carouselInterval = null }
+    // 清理音乐播放器
+    this.cleanupMusic()
     this.$set(this, 'auctionCountdown', 0)
   },
   watch: {
@@ -500,9 +580,226 @@ export default {
         const chatContainer = this.$refs.chatContainer
         if (chatContainer) { chatContainer.scrollTop = chatContainer.scrollHeight }
       })
+    },
+    // 监听游戏阶段变化，在准备阶段确保轮播数据存在
+    gamePhase(newPhase) {
+      if (newPhase === 'preparation') {
+        this.$nextTick(() => {
+          // 如果轮播数据为空，重新初始化
+          if (!this.artifactCarouselData || this.artifactCarouselData.length === 0) {
+            this.initializeArtifactCarousel()
+          } else {
+            // 数据已存在，只需确保轮播正常运行
+            this.startAutoCarousel()
+          }
+        })
+      } else {
+        // 离开准备阶段时停止轮播
+        this.stopAutoCarousel()
+      }
+      
+      // 根据游戏阶段调整音乐播放
+      this.handleGamePhaseMusic(newPhase)
     }
   },
   methods: {
+    // 初始化文物轮播数据（改进版：确保总有内容显示）
+    async initializeArtifactCarousel() {
+      try {
+        console.log('🧭 开始初始化文物轮播数据...')
+        
+        // 先检查是否有缓存的轮播数据
+        if (this.artifactCarouselData && this.artifactCarouselData.length > 0) {
+          console.log('📚 使用缓存轮播数据')
+          this.startAutoCarousel()
+          return
+        }
+        
+        // 直接使用artifacts表获取数据
+        const supabase = getSupabase()
+        console.log('🔗 获取Supabase实例:', supabase ? '✅ 成功' : '❌ 失败')
+        
+        console.log('📥 正在从artifacts表获取数据...')
+        const { data: artifactData, error: artifactError } = await supabase
+          .from('artifacts')
+          .select('id, name, era, location, image, base_value')
+          .limit(10) // 获取10个文物用于轮播
+          
+        console.log('📊 从artifacts表获取数据结果:', {
+          dataLength: artifactData ? artifactData.length : 0,
+          error: artifactError,
+          data: artifactData
+        })
+        
+        let finalData = []
+        
+        if (artifactError) {
+          console.error('❌ 从artifacts表获取文物数据失败:', artifactError)
+          console.log('🔄 使用模拟数据作为备用...')
+          finalData = this.getMockArtifactData()
+        } else if (artifactData && artifactData.length > 0) {
+          console.log('✅ 成功获取到文物数据:', artifactData.length, '条')
+          // 处理真实数据
+          finalData = artifactData.map((item, index) => {
+            console.log(`📸 处理文物 ${index + 1}:`, item.name, '原始图片URL:', item.image)
+            
+            // 确保图片URL是完整的URL
+            let imageUrl = item.image
+            if (imageUrl) {
+              if (imageUrl.startsWith('/')) {
+                // 相对路径，转换为绝对路径
+                console.log('🔄 转换相对路径为绝对路径...')
+                if (imageUrl.startsWith('/static/')) {
+                  // 静态资源路径，使用项目根路径
+                  imageUrl = window.location.origin + imageUrl
+                } else {
+                  // 其他相对路径，使用Supabase存储路径
+                  imageUrl = 'https://tgkzpywukorcwdsbfubw.supabase.co' + imageUrl
+                }
+              } else if (!imageUrl.startsWith('http')) {
+                // 可能是相对路径但缺少斜杠
+                console.log('🔄 处理可能缺少斜杠的路径...')
+                imageUrl = 'https://tgkzpywukorcwdsbfubw.supabase.co/storage/v1/object/public/' + imageUrl
+              }
+            }
+            
+            const processedItem = {
+              id: item.id,
+              name: item.name,
+              era: item.era,
+              location: item.location,
+              image: imageUrl || 'https://via.placeholder.com/400x300?text=文物预览',
+              baseValue: item.base_value
+            }
+            
+            console.log(`✅ 文物 ${index + 1} 处理完成 - 最终图片URL:`, processedItem.image)
+            return processedItem
+          })
+        } else {
+          console.log('📭 artifacts表为空，使用模拟数据')
+          finalData = this.getMockArtifactData()
+        }
+        
+        // 确保最终数据不为空
+        if (finalData.length === 0) {
+          console.log('⚠️ 最终数据为空，使用备用模拟数据')
+          finalData = this.getMockArtifactData()
+        }
+        
+        this.artifactCarouselData = finalData
+        console.log('🎯 最终轮播数据:', this.artifactCarouselData.length, '条')
+        console.log('🔄 开始自动轮播...')
+        
+        // 开始自动轮播
+        this.startAutoCarousel()
+      } catch (error) {
+        console.error('💥 初始化文物轮播失败:', error)
+        console.log('🔄 使用模拟数据作为最终备用...')
+        // 确保即使出错也有数据展示
+        this.artifactCarouselData = this.getMockArtifactData()
+        this.startAutoCarousel()
+      }
+    },
+    
+    // 获取模拟文物数据（备用方案）
+    getMockArtifactData() {
+      return [
+        {
+          id: 'artifact_001',
+          name: '唐代秘色瓷',
+          era: '唐代',
+          location: '中国',
+          image: 'https://via.placeholder.com/400x300/f0f0f0/666666?text=唐代秘色瓷',
+          baseValue: 8
+        },
+        {
+          id: 'artifact_002',
+          name: '达芬奇奇设图',
+          era: '文艺复兴',
+          location: '意大利',
+          image: 'https://via.placeholder.com/400x300/f0f0f0/666666?text=达芬奇奇设图',
+          baseValue: 9
+        },
+        {
+          id: 'artifact_003',
+          name: '琥珀化石',
+          era: '史前',
+          location: '波罗的海',
+          image: 'https://via.placeholder.com/400x300/f0f0f0/666666?text=琥珀化石',
+          baseValue: 6
+        },
+        {
+          id: 'artifact_004',
+          name: '维京龙头船',
+          era: '维京时代',
+          location: '北欧',
+          image: 'https://via.placeholder.com/400x300/f0f0f0/666666?text=维京龙头船',
+          baseValue: 7
+        },
+        {
+          id: 'artifact_005',
+          name: '星盘仪',
+          era: '中世纪',
+          location: '阿拉伯',
+          image: 'https://via.placeholder.com/400x300/f0f0f0/666666?text=星盘仪',
+          baseValue: 7
+        }
+      ]
+    },
+    
+    // 开始自动轮播
+    startAutoCarousel() {
+      if (this.carouselInterval) {
+        clearInterval(this.carouselInterval)
+      }
+      
+      // 确保有数据才开启轮播
+      if (!this.artifactCarouselData || this.artifactCarouselData.length === 0) {
+        console.log('⚠️ 轮播数据为空，不启动自动轮播')
+        return
+      }
+      
+      this.carouselInterval = setInterval(() => {
+        this.nextSlide()
+      }, 3000) // 每3秒自动切换
+    },
+    
+    // 停止自动轮播
+    stopAutoCarousel() {
+      if (this.carouselInterval) {
+        clearInterval(this.carouselInterval)
+        this.carouselInterval = null
+      }
+    },
+    
+    // 下一张幻灯片
+    nextSlide() {
+      if (this.artifactCarouselData && this.artifactCarouselData.length > 0) {
+        this.currentSlide = (this.currentSlide + 1) % this.artifactCarouselData.length
+      }
+    },
+    
+    // 上一张幻灯片
+    prevSlide() {
+      if (this.artifactCarouselData && this.artifactCarouselData.length > 0) {
+        this.currentSlide = (this.currentSlide - 1 + this.artifactCarouselData.length) % this.artifactCarouselData.length
+      }
+    },
+    
+    // 跳转到指定幻灯片
+    goToSlide(index) {
+      if (this.artifactCarouselData && index >= 0 && index < this.artifactCarouselData.length) {
+        this.currentSlide = index
+      }
+    },
+    
+    // 处理图片加载错误
+    handleImageError(artifact) {
+      console.warn(`文物图片加载失败: ${artifact.name}`)
+      // 可以设置默认图片或使用占位符
+      artifact.image = 'https://via.placeholder.com/400x300?text=文物预览'
+    },
+
     // 去掉模拟初始化玩家，改为使用房间的实际玩家列表
     async initializeGame() {
       const artifacts = await this.loadArtifacts()
@@ -723,6 +1020,214 @@ export default {
         console.warn('[game] handleGameEnd failed', e)
         // 兜底跳回房间列表
         this.$router.push('/rooms')
+      }
+    },
+
+    // 音乐控制相关方法
+    initializeMusic() {
+      try {
+        // 创建音频元素
+        this.audioElement = new Audio('/images/bgm.mp3')
+        this.audioElement.loop = true
+        this.audioElement.volume = this.musicVolume
+        
+        // 监听音频播放状态
+        this.audioElement.addEventListener('loadeddata', () => {
+          console.log('🎵 背景音乐加载完成')
+        })
+        
+        this.audioElement.addEventListener('error', (e) => {
+          console.error('🎵 背景音乐加载失败:', e)
+        })
+        
+        // 尝试自动播放（需要用户交互后才能生效）
+        this.audioElement.load()
+      } catch (error) {
+        console.error('🎵 初始化音乐播放器失败:', error)
+      }
+    },
+    
+    toggleMusic() {
+      if (!this.audioElement) return
+      
+      if (this.isMusicPlaying) {
+        this.pauseMusic()
+      } else {
+        this.playMusic()
+      }
+    },
+    
+    async playMusic() {
+      if (!this.audioElement) return
+      
+      try {
+        await this.audioElement.play()
+        this.isMusicPlaying = true
+        console.log('🎵 背景音乐开始播放')
+      } catch (error) {
+        console.warn('🎵 音乐播放失败，可能需要用户交互:', error)
+        // 如果是自动播放策略导致的失败，我们仍将状态标记为播放
+        this.isMusicPlaying = true
+      }
+    },
+    
+    pauseMusic() {
+      if (!this.audioElement) return
+      
+      this.audioElement.pause()
+      this.isMusicPlaying = false
+      console.log('🎵 背景音乐暂停')
+    },
+    
+    setVolume(volume) {
+      this.musicVolume = Math.max(0, Math.min(1, volume))
+      if (this.audioElement) {
+        this.audioElement.volume = this.musicVolume
+      }
+    },
+    
+    cleanupMusic() {
+      if (this.audioElement) {
+        this.pauseMusic()
+        this.audioElement = null
+      }
+    },
+    
+    // 根据游戏阶段处理音乐播放
+    handleGamePhaseMusic(phase) {
+      if (!this.audioElement) return
+      
+      // 只有在音乐正在播放时才需要根据阶段调整
+      if (!this.isMusicPlaying) return
+      
+      switch (phase) {
+        case 'preparation':
+          // 准备阶段：正常播放
+          this.setVolume(0.5)
+          break
+        case 'countdown':
+        case 'intermission':
+          // 倒计时和间歇阶段：降低音量
+          this.setVolume(0.3)
+          break
+        case 'auction':
+          // 拍卖阶段：正常音量
+          this.setVolume(0.5)
+          break
+        case 'item':
+          // 道具阶段：稍微降低音量
+          this.setVolume(0.4)
+          break
+        case 'settlement':
+          // 结算阶段：降低音量
+          this.setVolume(0.3)
+          break
+        default:
+          this.setVolume(0.5)
+      }
+    },
+
+    // 音乐控制相关方法
+    initializeMusic() {
+      try {
+        // 创建音频元素
+        this.audioElement = new Audio('/images/bgm.mp3')
+        this.audioElement.loop = true
+        this.audioElement.volume = this.musicVolume
+        
+        // 监听音频播放状态
+        this.audioElement.addEventListener('loadeddata', () => {
+          console.log('🎵 背景音乐加载完成')
+        })
+        
+        this.audioElement.addEventListener('error', (e) => {
+          console.error('🎵 背景音乐加载失败:', e)
+        })
+        
+        // 尝试自动播放（需要用户交互后才能生效）
+        this.audioElement.load()
+      } catch (error) {
+        console.error('🎵 初始化音乐播放器失败:', error)
+      }
+    },
+    
+    toggleMusic() {
+      if (!this.audioElement) return
+      
+      if (this.isMusicPlaying) {
+        this.pauseMusic()
+      } else {
+        this.playMusic()
+      }
+    },
+    
+    async playMusic() {
+      if (!this.audioElement) return
+      
+      try {
+        await this.audioElement.play()
+        this.isMusicPlaying = true
+        console.log('🎵 背景音乐开始播放')
+      } catch (error) {
+        console.warn('🎵 音乐播放失败，可能需要用户交互:', error)
+        // 如果是自动播放策略导致的失败，我们仍将状态标记为播放
+        this.isMusicPlaying = true
+      }
+    },
+    
+    pauseMusic() {
+      if (!this.audioElement) return
+      
+      this.audioElement.pause()
+      this.isMusicPlaying = false
+      console.log('🎵 背景音乐暂停')
+    },
+    
+    setVolume(volume) {
+      this.musicVolume = Math.max(0, Math.min(1, volume))
+      if (this.audioElement) {
+        this.audioElement.volume = this.musicVolume
+      }
+    },
+    
+    cleanupMusic() {
+      if (this.audioElement) {
+        this.pauseMusic()
+        this.audioElement = null
+      }
+    },
+    
+    // 根据游戏阶段处理音乐播放
+    handleGamePhaseMusic(phase) {
+      if (!this.audioElement) return
+      
+      // 只有在音乐正在播放时才需要根据阶段调整
+      if (!this.isMusicPlaying) return
+      
+      switch (phase) {
+        case 'preparation':
+          // 准备阶段：正常播放
+          this.setVolume(0.5)
+          break
+        case 'countdown':
+        case 'intermission':
+          // 倒计时和间歇阶段：降低音量
+          this.setVolume(0.3)
+          break
+        case 'auction':
+          // 拍卖阶段：正常音量
+          this.setVolume(0.5)
+          break
+        case 'item':
+          // 道具阶段：稍微降低音量
+          this.setVolume(0.4)
+          break
+        case 'settlement':
+          // 结算阶段：降低音量
+          this.setVolume(0.3)
+          break
+        default:
+          this.setVolume(0.5)
       }
     },
     async startGame() {

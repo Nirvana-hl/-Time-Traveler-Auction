@@ -38,11 +38,17 @@ class AuthService {
     
     // 获取用户资料
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('username, avatar')
         .eq('id', data.user.id)
         .single()
+      
+      if (error) {
+        console.warn('Failed to load user profile:', error)
+        // 如果无法获取用户资料，返回基础用户信息
+        return data.user
+      }
       
       // 将资料信息合并到用户对象中
       return {
