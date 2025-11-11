@@ -1,118 +1,118 @@
 <template>
-  <view class="collection-page">
-    <view class="page-header">
-      <text class="page-title">收藏集</text>
-      <view class="player-info">
-        <text class="player-name">{{ currentPlayer.name }}</text>
-        <text class="completion-rate">完成度: {{ completionRate }}%</text>
-      </view>
-    </view>
+  <div class="collection-page">
+    <div class="page-header">
+      <h2 class="page-title">收藏集</h2>
+      <div class="player-info">
+        <span class="player-name">{{ currentPlayer ? currentPlayer.name : '未知玩家' }}</span>
+        <span class="completion-rate">完成度: {{ completionRate }}%</span>
+      </div>
+    </div>
 
     <!-- 收藏集列表 -->
-    <view class="collections-list">
-      <view 
+    <div class="collections-list">
+      <div 
         v-for="collection in collections" 
         :key="collection.id"
         class="collection-card"
         :class="{ completed: isCollectionCompleted(collection) }"
       >
-        <image 
-          class="collection-icon" 
-          :src="collection.icon" 
-          mode="aspectFit"
-        />
-        <view class="collection-info">
-          <text class="collection-name">{{ collection.name }}</text>
-          <text class="collection-description">{{ collection.description }}</text>
-          <view class="collection-progress">
-            <view class="progress-bar">
-              <view 
+        <div class="collection-icon">🏆</div>
+        <div class="collection-info">
+          <h3 class="collection-name">{{ collection.name }}</h3>
+          <p class="collection-description">{{ collection.description }}</p>
+          <div class="collection-progress">
+            <div class="progress-bar">
+              <div 
                 class="progress-fill"
                 :style="{ width: getProgressWidth(collection) }"
-              ></view>
-            </view>
-            <text class="progress-text">
+              ></div>
+            </div>
+            <span class="progress-text">
               {{ getCurrentCount(collection) }}/{{ collection.requiredCount }}
-            </text>
-          </view>
-          <view class="collection-reward">
-            <text class="reward-label">奖励:</text>
-            <text class="reward-points">{{ collection.rewardPoints }} 分</text>
-            <text 
+            </span>
+          </div>
+          <div class="collection-reward">
+            <span class="reward-label">奖励:</span>
+            <span class="reward-points">{{ collection.rewardPoints }} 分</span>
+            <span 
               class="reward-status"
               v-if="isCollectionCompleted(collection)"
             >
               已完成 ✓
-            </text>
-          </view>
-        </view>
-      </view>
-    </view>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 我的奇物 -->
-    <view class="my-artifacts">
-      <text class="section-title">我的奇物 ({{ playerArtifacts.length }})</text>
-      <view class="artifacts-grid">
-        <view 
+    <div class="my-artifacts">
+      <h3 class="section-title">我的奇物 ({{ playerArtifacts.length }})</h3>
+      <div class="artifacts-grid">
+        <div 
           v-for="artifact in playerArtifacts" 
           :key="artifact.id"
           class="artifact-card"
           @click="showArtifactDetail(artifact)"
         >
-          <image 
+          <img 
             class="artifact-image" 
             :src="artifact.image" 
-            mode="aspectFit"
+            alt="奇物图片"
           />
-          <view class="artifact-info">
-            <text class="artifact-name">{{ artifact.name }}</text>
-            <text class="artifact-era">{{ artifact.era }}</text>
-            <view class="artifact-tags">
-              <text 
+          <div class="artifact-info">
+            <h4 class="artifact-name">{{ artifact.name }}</h4>
+            <p class="artifact-era">{{ artifact.era }}</p>
+            <div class="artifact-tags">
+              <span 
                 v-for="tag in artifact.collectionTags" 
                 :key="tag"
                 class="artifact-tag"
               >
                 {{ tag }}
-              </text>
-            </view>
-            <text class="artifact-value">价值: {{ artifact.baseValue }}</text>
-          </view>
-        </view>
-      </view>
-    </view>
+              </span>
+            </div>
+            <span class="artifact-value">价值: {{ artifact.baseValue }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 奇物详情弹窗 -->
-    <uni-popup ref="artifactDetailPopup" type="center">
-      <view class="artifact-detail-popup" v-if="selectedArtifact">
-        <image 
+    <div v-if="selectedArtifact" class="artifact-detail-popup">
+      <div class="popup-overlay" @click="hideArtifactDetail"></div>
+      <div class="popup-content">
+        <img 
           class="detail-image" 
           :src="selectedArtifact.image" 
-          mode="aspectFit"
+          alt="奇物图片"
         />
-        <view class="detail-content">
-          <text class="detail-name">{{ selectedArtifact.name }}</text>
-          <text class="detail-era">{{ selectedArtifact.era }} - {{ selectedArtifact.location }}</text>
-          <text class="detail-story">{{ selectedArtifact.story }}</text>
-          <view class="detail-tags">
-            <text 
+        <div class="detail-content">
+          <h3 class="detail-name">{{ selectedArtifact.name }}</h3>
+          <p class="detail-era">{{ selectedArtifact.era }} - {{ selectedArtifact.location }}</p>
+          <p class="detail-story">{{ selectedArtifact.story }}</p>
+          <div class="detail-tags">
+            <span 
               v-for="tag in selectedArtifact.collectionTags" 
               :key="tag"
               class="detail-tag"
             >
               {{ tag }}
-            </text>
-          </view>
-          <text class="detail-value">基础价值: {{ selectedArtifact.baseValue }}</text>
-        </view>
+            </span>
+          </div>
+          <p class="detail-value">基础价值: {{ selectedArtifact.baseValue }}</p>
+        </div>
         <button class="close-button" @click="hideArtifactDetail">关闭</button>
-      </view>
-    </uni-popup>
-  </view>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
 import { mapState } from 'vuex'
+import { loadCollectionsFromArtifacts, getCurrentCollectionCount, getCollectionProgress } from '../../features/game/collections.utils'
+import { loadArtifacts as loadArtifactsService } from '../../features/game/artifacts.service'
+import { getSupabase } from '../../services/supabase-client'
 
 export default {
   name: 'CollectionPage',
@@ -120,7 +120,8 @@ export default {
     return {
       collections: [],
       playerArtifacts: [],
-      selectedArtifact: null
+      selectedArtifact: null,
+      artifactMap: {}
     }
   },
   computed: {
@@ -145,25 +146,24 @@ export default {
     
     async loadCollections() {
       try {
-        const response = await uni.request({
-          url: '/static/data/collections.json'
-        })
-        this.collections = response.data
+        // 加载所有奇物数据
+        const artifacts = await loadArtifactsService({ supabase: getSupabase() })
+        this.artifactMap = artifacts.reduce((acc, a) => { acc[a.id] = a; return acc }, {})
+        // 使用动态生成收藏集，与 index.vue 保持一致
+        this.collections = loadCollectionsFromArtifacts(this.artifactMap)
       } catch (error) {
         console.error('加载收藏集数据失败:', error)
+        this.collections = []
       }
     },
     
     async loadPlayerArtifacts() {
       if (this.currentPlayer && this.currentPlayer.artifacts) {
         try {
-          const response = await uni.request({
-            url: '/static/data/artifacts.json'
-          })
-          const allArtifacts = response.data
-          this.playerArtifacts = allArtifacts.filter(artifact => 
-            this.currentPlayer.artifacts.includes(artifact.id)
-          )
+          // 使用已加载的 artifactMap
+          this.playerArtifacts = (this.currentPlayer.artifacts || [])
+            .map(aid => this.artifactMap[aid])
+            .filter(Boolean)
         } catch (error) {
           console.error('加载奇物数据失败:', error)
         }
@@ -176,23 +176,30 @@ export default {
     },
     
     getCurrentCount(collection) {
-      if (!this.currentPlayer || !this.currentPlayer.collections) return 0
-      return this.currentPlayer.collections[collection.name] || 0
+      // 统一使用 collections.utils.js 的计算逻辑
+      const ownedArtifactIds = (this.currentPlayer && this.currentPlayer.artifacts) ? this.currentPlayer.artifacts : []
+      return getCurrentCollectionCount({
+        artifactMap: this.artifactMap,
+        ownedArtifactIds: ownedArtifactIds,
+        collection: collection
+      })
     },
     
     getProgressWidth(collection) {
+      // 统一使用 collections.utils.js 的进度计算
       const currentCount = this.getCurrentCount(collection)
-      const percentage = Math.min((currentCount / collection.requiredCount) * 100, 100)
-      return `${percentage}%`
+      const progress = getCollectionProgress({
+        current: currentCount,
+        required: collection.requiredCount
+      })
+      return `${progress}%`
     },
     
     showArtifactDetail(artifact) {
       this.selectedArtifact = artifact
-      this.$refs.artifactDetailPopup.open()
     },
     
     hideArtifactDetail() {
-      this.$refs.artifactDetailPopup.close()
       this.selectedArtifact = null
     }
   }
@@ -218,6 +225,7 @@ export default {
   font-size: 20px;
   font-weight: bold;
   color: #333;
+  margin: 0;
 }
 
 .player-info {
@@ -270,15 +278,13 @@ export default {
   font-size: 18px;
   font-weight: bold;
   color: #333;
-  display: block;
-  margin-bottom: 4px;
+  margin: 0 0 4px 0;
 }
 
 .collection-description {
   font-size: 14px;
   color: #666;
-  display: block;
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
 }
 
 .collection-progress {
@@ -338,8 +344,7 @@ export default {
   font-size: 16px;
   font-weight: bold;
   color: #333;
-  margin-bottom: 12px;
-  display: block;
+  margin: 0 0 12px 0;
 }
 
 .artifacts-grid {
@@ -370,15 +375,13 @@ export default {
   font-size: 16px;
   font-weight: bold;
   color: #333;
-  display: block;
-  margin-bottom: 4px;
+  margin: 0 0 4px 0;
 }
 
 .artifact-era {
   font-size: 12px;
   color: #666;
-  display: block;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
 .artifact-tags {
@@ -404,7 +407,29 @@ export default {
 }
 
 .artifact-detail-popup {
-  background: #fff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+}
+
+.popup-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.popup-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
   border-radius: 12px;
   padding: 20px;
   max-width: 80vw;
@@ -427,23 +452,20 @@ export default {
   font-size: 20px;
   font-weight: bold;
   color: #333;
-  display: block;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
 .detail-era {
   font-size: 14px;
   color: #666;
-  display: block;
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
 }
 
 .detail-story {
   font-size: 14px;
   color: #333;
   line-height: 1.5;
-  display: block;
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
 }
 
 .detail-tags {

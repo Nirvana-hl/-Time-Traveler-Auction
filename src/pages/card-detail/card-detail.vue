@@ -72,12 +72,17 @@
 
 <script>
 import { mapState } from 'vuex'
+import { loadArtifacts as loadArtifactsService } from '../../features/game/artifacts.service'
+import { loadCollectionsFromArtifacts, getCurrentCollectionCount } from '../../features/game/collections.utils'
+import { getSupabase } from '../../services/supabase-client'
 
 export default {
   name: 'CardDetailPage',
   data() {
     return {
-      artifact: null
+      artifact: null,
+      collections: [],
+      artifactMap: {}
     }
   },
   computed: {
@@ -85,6 +90,7 @@ export default {
   },
   async mounted() {
     await this.loadArtifact()
+    await this.loadCollections()
   },
   methods: {
     async loadArtifact() {
@@ -99,11 +105,10 @@ export default {
       }
 
       try {
-        const response = await uni.request({
-          url: '/static/data/artifacts.json'
-        })
-        const artifacts = response.data
-        this.artifact = artifacts.find(artifact => artifact.id === artifactId)
+        // 使用统一的加载方式，从数据库加载
+        const artifacts = await loadArtifactsService({ supabase: getSupabase() })
+        this.artifactMap = artifacts.reduce((acc, a) => { acc[a.id] = a; return acc }, {})
+        this.artifact = this.artifactMap[artifactId]
         
         if (!this.artifact) {
           uni.showToast({
@@ -122,6 +127,16 @@ export default {
       }
     },
     
+    async loadCollections() {
+      try {
+        // 动态生成收藏集数据，与 index.vue 保持一致
+        this.collections = loadCollectionsFromArtifacts(this.artifactMap)
+      } catch (error) {
+        console.error('加载收藏集数据失败:', error)
+        this.collections = []
+      }
+    },
+    
     onImageError() {
       console.error('奇物图片加载失败:', this.artifact.image)
       // 可以设置默认图片
@@ -129,23 +144,21 @@ export default {
     },
     
     getCollectionProgress(tag) {
-      if (!this.currentPlayer || !this.currentPlayer.collections) {
+      // 从动态生成的收藏集中查找对应收藏集
+      const collection = this.collections.find(col => col.name === tag)
+      if (!collection) {
         return '0/未知'
       }
       
-      const currentCount = this.currentPlayer.collections[tag] || 0
-      const requiredCount = this.getRequiredCount(tag)
-      return `${currentCount}/${requiredCount}`
-    },
-    
-    getRequiredCount(tag) {
-      const requirements = {
-        '艺术瑰宝': 3,
-        '科技奇点': 2,
-        '生命奥秘': 3,
-        '权力象征': 2
-      }
-      return requirements[tag] || 0
+      // 统一使用 collections.utils.js 的计算逻辑
+      const ownedArtifactIds = (this.currentPlayer && this.currentPlayer.artifacts) ? this.currentPlayer.artifacts : []
+      const currentCount = getCurrentCollectionCount({
+        artifactMap: this.artifactMap,
+        ownedArtifactIds: ownedArtifactIds,
+        collection: collection
+      })
+      
+      return `${currentCount}/${collection.requiredCount}`
     },
     
     goBack() {

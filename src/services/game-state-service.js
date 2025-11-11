@@ -5,11 +5,10 @@ class GameStateService {
   constructor() {
     this.gameState = {
       gameId: null,
-      phase: 'preparation', // preparation, auction, item, settlement
+      phase: 'preparation', // preparation, auction, settlement
       players: [],
       currentAuction: null,
       deck: [],
-      usedItems: [],
       gameLog: []
     }
   }
@@ -26,7 +25,6 @@ class GameStateService {
       name: name,
       energy: 50, // 初始能量
       artifacts: [],
-      items: [],
       collections: {
         "艺术瑰宝": 0,
         "科技奇点": 0,
@@ -85,15 +83,6 @@ class GameStateService {
   }
 
   /**
-   * 开始道具阶段
-   */
-  startItemPhase() {
-    this.gameState.phase = 'item'
-    this.addGameLog('道具阶段开始！玩家可以购买和使用道具')
-    return this.gameState
-  }
-
-  /**
    * 结束游戏
    */
   endGame() {
@@ -135,12 +124,33 @@ class GameStateService {
 
   /**
    * 获取收藏集信息
+   * 注意：此方法已废弃，建议使用 loadCollectionsFromArtifacts 动态生成
+   * 保留此方法以保持向后兼容
    */
   async getCollectionByName(collectionName) {
     try {
-      const data = require('../../static/data/collections.json')
-      const list = Array.isArray(data) ? data : (data.default || [])
-      return list.find(collection => collection.name === collectionName)
+      // 尝试从动态生成的收藏集中查找
+      if (this.gameState.deck && this.gameState.deck.length > 0) {
+        const { loadCollectionsFromArtifacts } = require('../features/game/collections.utils')
+        const artifactMap = {}
+        this.gameState.deck.forEach(artifact => {
+          if (artifact && artifact.id) {
+            artifactMap[artifact.id] = artifact
+          }
+        })
+        const collections = loadCollectionsFromArtifacts(artifactMap)
+        const found = collections.find(col => col.name === collectionName)
+        if (found) return found
+      }
+      
+      // 回退到 JSON 文件（如果存在）
+      try {
+        const data = require('../../static/data/collections.json')
+        const list = Array.isArray(data) ? data : (data.default || [])
+        return list.find(collection => collection.name === collectionName) || null
+      } catch (jsonError) {
+        return null
+      }
     } catch (error) {
       console.error('加载收藏集数据失败:', error)
       return null

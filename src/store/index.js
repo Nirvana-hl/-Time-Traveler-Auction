@@ -2,7 +2,6 @@ import Vue from 'vue'
 import Vuex from 'vuex'
 import auctionService from '../services/auction-service.js'
 import auctionPersist from '../services/auction-persist-service.js'
-import itemService from '../services/item-service.js'
 import gameStateService from '../services/game-state-service.js'
 import { getSupabase } from '../services/supabase-client.js'
 
@@ -11,7 +10,7 @@ Vue.use(Vuex)
 const store = new Vuex.Store({
   state: {
     // 游戏状态
-    gamePhase: 'preparation', // preparation, auction, item, settlement
+    gamePhase: 'preparation', // preparation, auction, settlement
     players: [],
     currentAuctions: [],
     gameLog: [],
@@ -19,13 +18,11 @@ const store = new Vuex.Store({
     // UI状态
     showCardDetail: false,
     selectedCard: null,
-    showShop: false,
     
     // 玩家数据
     currentPlayer: null,
     playerEnergy: 50,
     playerArtifacts: [],
-    playerItems: [],
 
     // 回合状态
     roundCurrent: 0,
@@ -74,10 +71,6 @@ const store = new Vuex.Store({
       state.selectedCard = card
     },
     
-    SET_SHOW_SHOP(state, show) {
-      state.showShop = show
-    },
-    
     // 玩家数据相关
     SET_CURRENT_PLAYER(state, player) {
       state.currentPlayer = player
@@ -89,10 +82,6 @@ const store = new Vuex.Store({
     
     SET_PLAYER_ARTIFACTS(state, artifacts) {
       state.playerArtifacts = artifacts
-    },
-    
-    SET_PLAYER_ITEMS(state, items) {
-      state.playerItems = items
     },
 
     SET_USER(state, user) {
@@ -259,27 +248,6 @@ const store = new Vuex.Store({
       return result
     },
     
-    // 购买道具
-    async buyItem({ commit, state }, { playerId, itemId }) {
-      try {
-        const result = itemService.buyItem(playerId, itemId, state.playerEnergy)
-        commit('SET_PLAYER_ENERGY', result.remainingEnergy)
-        return result
-      } catch (error) {
-        throw error
-      }
-    },
-    
-    // 使用道具
-    async useItem({ commit, state }, { playerId, itemId, target }) {
-      try {
-        const result = itemService.useItem(playerId, itemId, target)
-        return result
-      } catch (error) {
-        throw error
-      }
-    },
-    
     // 显示卡牌详情
     showCardDetail({ commit }, card) {
       commit('SET_SELECTED_CARD', card)
@@ -290,16 +258,6 @@ const store = new Vuex.Store({
     hideCardDetail({ commit }) {
       commit('SET_SHOW_CARD_DETAIL', false)
       commit('SET_SELECTED_CARD', null)
-    },
-    
-    // 显示商店
-    showShop({ commit }) {
-      commit('SET_SHOW_SHOP', true)
-    },
-    
-    // 隐藏商店
-    hideShop({ commit }) {
-      commit('SET_SHOW_SHOP', false)
     },
     
     // 更新游戏状态
@@ -314,7 +272,6 @@ const store = new Vuex.Store({
     // 游戏状态
     isGameActive: state => state.gamePhase !== 'settlement',
     isAuctionPhase: state => state.gamePhase === 'auction',
-    isItemPhase: state => state.gamePhase === 'item',
     
     // 当前拍卖信息（列表）
     currentAuctionsInfo: state => {
@@ -334,8 +291,7 @@ const store = new Vuex.Store({
         id: state.currentPlayer.id,
         name: state.currentPlayer.name,
         energy: state.playerEnergy,
-        artifacts: state.playerArtifacts,
-        items: state.playerItems
+        artifacts: state.playerArtifacts
       }
     },
     

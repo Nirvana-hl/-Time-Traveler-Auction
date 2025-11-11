@@ -116,34 +116,22 @@ export function calculatePlayerScore(player, collections, artifacts) {
 }
 
 /**
- * 验证道具使用条件
- * @param {Object} item - 道具对象
- * @param {string} gamePhase - 当前游戏阶段
- * @param {Object} currentAuction - 当前拍卖状态
- * @returns {boolean} 是否可以使用
- */
-export function validateItemUse(item, gamePhase, currentAuction) {
-  // 检查使用时机
-  switch (item.useTiming) {
-    case 'anytime':
-      return true
-    case 'auction_start':
-      return gamePhase === 'auction' && currentAuction && currentAuction.status === 'active'
-    case 'auction_countdown':
-      return gamePhase === 'auction' && currentAuction && currentAuction.timeRemaining > 0
-    case 'after_auction':
-      return gamePhase === 'item'
-    default:
-      return false
-  }
-}
-
-/**
  * 获取收藏集要求数量
  * @param {string} collectionName - 收藏集名称
+ * @param {Array} collections - 收藏集列表（从 loadCollectionsFromArtifacts 生成）
  * @returns {number} 要求数量
+ * @deprecated 建议直接使用 collection.requiredCount，此方法保留以保持向后兼容
  */
-export function getCollectionRequirement(collectionName) {
+export function getCollectionRequirement(collectionName, collections = null) {
+  // 如果提供了收藏集列表，优先从列表中查找
+  if (collections && Array.isArray(collections)) {
+    const collection = collections.find(col => col.name === collectionName)
+    if (collection && typeof collection.requiredCount === 'number') {
+      return collection.requiredCount
+    }
+  }
+  
+  // 回退到硬编码（向后兼容）
   const requirements = {
     '艺术瑰宝': 3,
     '科技奇点': 2,
@@ -179,7 +167,6 @@ export function getGamePhaseText(phase) {
   const phaseMap = {
     'preparation': '准备阶段',
     'auction': '拍卖阶段',
-    'item': '道具阶段',
     'settlement': '结算阶段'
   }
   return phaseMap[phase] || '未知阶段'

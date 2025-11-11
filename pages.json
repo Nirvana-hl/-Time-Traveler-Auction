@@ -14,12 +14,6 @@
             }
         },
         {
-            "path": "pages/shop/shop",
-            "style": {
-                "navigationBarTitleText": "道具商店"
-            }
-        },
-        {
             "path": "pages/collection/collection",
             "style": {
                 "navigationBarTitleText": "收藏集"
@@ -43,12 +37,6 @@
                 "iconPath": "static/tab-home.png",
                 "selectedIconPath": "static/tab-home-current.png",
                 "text": "游戏"
-            },
-            {
-                "pagePath": "pages/shop/shop",
-                "iconPath": "static/tab-shop.png",
-                "selectedIconPath": "static/tab-shop-current.png",
-                "text": "商店"
             },
             {
                 "pagePath": "pages/collection/collection",

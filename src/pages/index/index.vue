@@ -21,16 +21,10 @@
         <div class="room-id-pill">ID: {{ room ? (room.short_id || room.id) : '-' }}</div>
       </div>
       <span class="game-phase">{{ gamePhaseText }}</span>
-       <div class="player-energy-hud" v-if="currentPlayer && gamePhase === 'item'">
-        <span class="icon">⚡</span>
-        <span class="label">能量</span>
-        <span class="value">{{ $store.state.playerEnergy }}</span>
-      </div>
       <div class="game-controls">
         <button class="control-button" @click="toggleReady" v-if="gamePhase === 'preparation'">{{ currentUserReady ? '取消准备' : '准备' }}</button>
         <button class="control-button" @click="startGame" v-if="gamePhase === 'preparation' && isOwner && allReady">开始游戏</button>
         <button class="control-button" @click="startAuction" v-if="false">开始拍卖</button>
-        <button class="control-button" @click="openShop" v-if="gamePhase === 'item'">道具商店</button>
         <button class="control-button danger" @click="leaveRoom">退出房间</button>
       </div>
     </div>
@@ -294,14 +288,6 @@
         </div>
       </div>
 
-    <!-- 道具商店弹窗：复用全局商店组件 <item-shop />，与 /shop 页面共用一套逻辑 -->
-    <div v-if="showShop" class="shop-popup">
-      <div class="popup-overlay" @click="closeShop"></div>
-      <div class="popup-content">
-        <item-shop />
-        <button class="close-button" @click="closeShop">关闭商店</button>
-      </div>
-    </div>
 
     <!-- 手牌弹窗：查看某位玩家的手牌缩略（当前仅展示当前玩家持有的真实列表） -->
     <div v-if="showHandPopup" class="hand-popup">
@@ -355,7 +341,6 @@
 <script>
 import { mapState, mapGetters } from 'vuex'
 import AuctionPanel from '../../components/auction-panel/auction-panel.vue'
-import ItemShop from '../../components/item-shop/item-shop.vue'
 import roomService from '../../services/room-service'
 import { getSupabase } from '../../services/supabase-client'
 import auctionService from '../../services/auction-service'
@@ -372,8 +357,7 @@ import { firstLoginDialogue as firstLoginDialogueConfig, getCurrentLanguage as g
 export default {
   name: 'GameIndex',
   components: {
-    AuctionPanel,
-    ItemShop
+    AuctionPanel
   },
   data() {
     return {
@@ -407,7 +391,7 @@ export default {
     }
   },
   computed: {
-    ...mapState(['gamePhase', 'gameLog', 'showCardDetail', 'showShop', 'user', 'roomId', 'roundCurrent', 'roundTotal']),
+    ...mapState(['gamePhase', 'gameLog', 'showCardDetail', 'user', 'roomId', 'roundCurrent', 'roundTotal']),
     // 将当前玩家注入到渲染上下文，避免模板引用报错
     currentPlayer() { return this.$store.state.currentPlayer },
     isOwner() { return this.room && this.user && this.room.owner_id === this.user.id },
@@ -452,7 +436,6 @@ export default {
         'countdown': '预倒计时',
         'intermission': '间歇阶段',
         'auction': '拍卖阶段',
-        'item': '道具阶段',
         'settlement': '结算阶段'
       }
       return phaseMap[this.gamePhase] || '未知阶段'
@@ -816,14 +799,6 @@ export default {
         const supabase = getSupabase()
         return await loadArtifactsService({ supabase })
       } catch (error) { console.error('加载卡牌数据失败:', error); return [] }
-    },
-    
-    openShop() {
-      this.$store.commit('SET_SHOW_SHOP', true)
-    },
-    
-    closeShop() {
-      this.$store.commit('SET_SHOW_SHOP', false)
     },
     
     showArtifactDetail(artifactId) {

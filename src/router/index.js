@@ -2,12 +2,10 @@ import Vue from 'vue'
 import VueRouter from 'vue-router'
 import GameIndex from '../pages/index/index.vue'
 import CardDetail from '../pages/card-detail/card-detail.vue'
-import Shop from '../pages/shop/shop.vue'
 import Collection from '../pages/collection/collection.vue'
 import Login from '../pages/auth/login.vue'
 import Rooms from '../pages/rooms/rooms.vue'
 import CreateRoom from '../pages/create-room/create-room.vue'
-import PlayerPage from '../pages/player/player.vue'
 import Menu from '../pages/menu/menu.vue'
 import Profile from '../pages/profile/profile.vue'
 
@@ -24,11 +22,6 @@ const routes = [
     path: '/card-detail',
     name: 'CardDetail',
     component: CardDetail
-  },
-  {
-    path: '/shop',
-    name: 'Shop',
-    component: Shop
   },
   {
     path: '/collection',
@@ -49,11 +42,6 @@ const routes = [
     path: '/create-room',
     name: 'CreateRoom',
     component: CreateRoom
-  },
-  {
-    path: '/player/:id',
-    name: 'PlayerPage',
-    component: PlayerPage
   },
   {
     path: '/game',
