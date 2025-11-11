@@ -23,7 +23,7 @@ export async function startGame({
   store.commit('SET_GAME_PHASE', 'countdown')
   setCountdown(5)
   // 回合归零并设置总回合数（6）
-  try { store.commit('RESET_ROUND'); store.commit('SET_ROUND_TOTAL', 6) } catch (_) {}
+  try { store.commit('RESET_ROUND'); store.commit('SET_ROUND_TOTAL', 4) } catch (_) {}
   store.commit('ADD_GAME_LOG', { timestamp: Date.now(), message: '游戏开始！所有玩家获得50点初始能量（5s后开始拍卖）' })
 
   // 设置当前玩家（从 room 中解析）
@@ -85,13 +85,13 @@ export async function autoStartAuction({
   // 推进回合并在第6回合后结束游戏（房主触发）
   try {
     const current = Number(store.state.roundCurrent || 0) + 1
-    const total = Number(store.state.roundTotal || 6)
+    const total = Number(store.state.roundTotal || 4)
     store.commit('SET_ROUND_CURRENT', Math.min(current, total))
   } catch (_) {}
 
   if (roomId) {
     const current = Number(store.state.roundCurrent || 0)
-    const total = Number(store.state.roundTotal || 6)
+    const total = Number(store.state.roundTotal || 4)
     
     // 广播拍卖开始，包含回合数信息，确保所有玩家都能看到当前回合
     await supabase.channel(`room_cast_${roomId}`).send({ 

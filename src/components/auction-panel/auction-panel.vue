@@ -124,7 +124,7 @@ export default {
     countdown: { type: Number, default: 0 },
     // 新增：回合显示由父组件传入，与拍卖会同框展示
     roundCurrent: { type: Number, default: 0 },
-    roundTotal: { type: Number, default: 6 }
+    roundTotal: { type: Number, default: 4 }
   },
   data() {
     return {
